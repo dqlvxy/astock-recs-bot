@@ -934,4 +934,14 @@ export {
   scoreTechDetail,
   scoreMsgDetail,
   scoreFundDetail,
+  /* ── 供 today.js（全模块云端快照）复用 ── */
+  getIndex,
+  getZTPool,
+  getDTPool,
+  取日K,
+  batchKlines,
+  批行业,
+  上一交易日,
+  取行情文本,
+  解行情,
 };
