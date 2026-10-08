@@ -52,17 +52,17 @@ jobs:
           git config user.name "astock-bot"
           git config user.email "astock-bot@users.noreply.github.com"
 
-          提交了=0
+          COMMITTED=0
           for f in recs.json today.json watch.json; do
             if [ -f "$f" ]; then
               git add "$f"
-              提交了=1
+              COMMITTED=1
             else
               echo "$f 不存在（可能非交易日），跳过"
             fi
           done
 
-          if [ "$提交了" = "0" ]; then
+          if [ "$COMMITTED" = "0" ]; then
             echo "没有任何快照文件可提交"
             exit 0
           fi
