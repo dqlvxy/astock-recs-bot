@@ -2,4 +2,12 @@ node_modules/
 .DS_Store
 *.log
 .env
+.env.*
 .wrangler/
+
+# 凭据与密钥文件（绝不提交）
+*凭据*
+*凭据记录*
+账号凭据记录.md
+*.pem
+*.key
