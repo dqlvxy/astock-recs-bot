@@ -1,0 +1,14 @@
+{
+  "name": "astock-recs-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "A股尾盘短线每日 14:30 云端定时荐股：Node 引擎 + GitHub Actions + Cloudflare KV",
+  "scripts": {
+    "start": "node generate.js",
+    "test": "node test-engine.js"
+  },
+  "dependencies": {
+    "iconv-lite": "^0.6.3"
+  }
+}
