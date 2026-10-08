@@ -1,0 +1,9 @@
+name = "astock-recs-reader"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+
+# KV 绑定：读端 Worker 从这里读取最新荐股
+# 把 id 替换成你 Cloudflare 后台「Workers KV」里 ASTOCK_SYNC 命名空间的实际 ID
+[[kv_namespaces]]
+binding = "ASTOCK_SYNC"
+id = "<KV_NAMESPACE_ID>"
