@@ -74,6 +74,22 @@ jobs:
             git push
           fi
 
+      # ── ③' 刷新 jsDelivr CDN 缓存（关键，别删）────────────────────
+      # 前端只读 CDN。推完仓库后 CDN 不会立刻更新（@main 缓存最长 7 天），
+      # 必须显式 purge，否则看板会一直显示旧数据。全部用 ASCII 变量名。
+      - name: 刷新 jsDelivr CDN 缓存
+        run: |
+          for f in recs.json today.json watch.json; do
+            if [ -f "$f" ]; then
+              echo "purge $f ..."
+              code=$(curl -s -o /dev/null -w "%{http_code}" \
+                --max-time 30 \
+                "https://purge.jsdelivr.net/gh/${{ github.repository }}@main/$f" || echo "000")
+              echo "  -> HTTP $code"
+            fi
+          done
+          echo "缓存刷新请求已发出（200 表示受理）"
+
       # ── ④ 上传产物，便于手动下载检查 ───────────────────────────────
       - name: 上传产物
         uses: actions/upload-artifact@v4
