@@ -209,6 +209,85 @@ async function 批腾讯行情(码表){
   return 映;
 }
 
+/* 由日K自算统计指标，产出与前端 renderWatch 消费的 prob 结构一致。
+ *
+ * 为什么要在这里算：
+ *   自选卡片要显示「68%区间 / 涨超1% / 跌超1% / 近5日动量 / 20日均收益 /
+ *   20日波动 / 次日置信分」。原先这些字段指望数据源给，但本脚本 early
+ *   版本直接写了 prob: null，导致走云端的自选卡片这些格子全是「—」「-」。
+ *   前端已加 K 线自算兜底，这里同步产出，做到「云端给了就用、没给前端自己算」。
+ *
+ * 口径（近 20 个交易日日收益率，样本标准差）：
+ *   momentum  近5日涨跌幅              (收盘/5日前收盘 - 1) × 100
+ *   mean_ret  日收益率均值
+ *   std       日收益率样本标准差
+ *   range     现价 × (1 ± std/100)
+ *   p_down1   正态假设 P(日收益 < -1%)
+ *   p_up1     正态假设 P(日收益 > +1%)
+ *   score / prob_up  由「涨跌概率差」与动量方向合成
+ * 注：该口径与前端 自算自选概率() 完全一致，改一处必须同步另一处。 */
+function 算自选概率(kline) {
+  try {
+    if (!kline || kline.length < 16) return null;
+    const cl = kline.map((r) => Number(r[2])).filter((v) => v > 0);
+    if (cl.length < 16) return null;
+    const n = cl.length, 现价 = cl[n - 1];
+
+    const 全 = [];
+    for (let j = 1; j < n; j++) 全.push(((cl[j] - cl[j - 1]) / cl[j - 1]) * 100);
+    const r = 全.slice(-20);
+    if (r.length < 15) return null;
+
+    const 均 = r.reduce((s, v) => s + v, 0) / r.length;
+    const 方 = r.reduce((s, v) => s + (v - 均) * (v - 均), 0) / (r.length - 1);
+    const 标 = Math.sqrt(方);
+    if (!(标 > 0)) return null;
+
+    const 动 = (cl[n - 1] / cl[Math.max(0, n - 6)] - 1) * 100;
+
+    /* 标准正态 CDF（Abramowitz-Stegun 近似） */
+    const 正态 = (z) => {
+      const 符 = z < 0 ? -1 : 1, x = Math.abs(z);
+      const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741,
+            a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+      const t = 1 / (1 + p * x);
+      const y = 1 - ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+      return 0.5 * (1 + 符 * y);
+    };
+    const 取整 = (x, d) => { const q = Math.pow(10, d); return Math.round(x * q) / q; };
+
+    const 跌超1 = 100 * 正态((-1 - 均) / 标);
+    const 涨超1 = 100 * (1 - 正态((1 - 均) / 标));
+    const 净 = 涨超1 - 跌超1;
+    const 分 = Math.max(0, Math.min(100, 50 + 净 * 0.42 + 动 * 1.6));
+    const 置信 = Math.max(0, Math.min(99, 50 + 净 * 0.30 + 动 * 1.2));
+
+    const 片 = cl.slice(-20);
+    const 高20 = Math.max(...片), 低20 = Math.min(...片);
+    const 位 = (高20 - 低20) > 0 ? (现价 - 低20) / (高20 - 低20) : 0.5;
+    let 语;
+    if (动 > 4) 语 = "近5日动量偏强";
+    else if (动 < -4) 语 = "近5日动量偏弱";
+    else if (标 > 2.8) 语 = "近期波动较大，仓位宜轻";
+    else 语 = "动量与波动处于中性区间";
+    if (位 > 0.85 && 动 > 0) 语 += "；现价接近20日高点，短期回归压力";
+    if (位 < 0.15 && 动 < 0) 语 += "；现价接近20日低点，存在修复动能";
+
+    return {
+      momentum: 取整(动, 2),
+      mean_ret: 取整(均, 2),
+      std: 取整(标, 2),
+      range_lo: 取整(现价 * (1 - 标 / 100), 4),
+      range_hi: 取整(现价 * (1 + 标 / 100), 4),
+      score: 取整(分, 1),
+      prob_up: 取整(置信, 1),
+      p_up1: 取整(涨超1, 1),
+      p_down1: 取整(跌超1, 1),
+      note: 语,
+    };
+  } catch (e) { return null; }
+}
+
 async function 建自选(全市场映射){
   const 码表 = 读自选清单();
   /* ETF/LOF 取腾讯行情（东财全市场不含基金），个股优先用全市场数据 */
@@ -219,8 +298,9 @@ async function 建自选(全市场映射){
     let kline = [];
     try {
       const rows = await 取日K(code);
-      /* 转成前端 buildDays() 需要的 [日期, 开, 收, 高, 低, 量] 结构 */
-      kline = (rows || []).slice(-20).map((r) => [
+      /* 取 60 根：前端要用近 20 个日收益率算波动率与区间概率，
+         只给 20 根会差一根凑不满样本。多给不占多少体积，还能画更长的 K 线。 */
+      kline = (rows || []).slice(-60).map((r) => [
         r.TRADE_DATE, r.OPEN_PRICE, r.CLOSE_PRICE, r.HIGH_PRICE, r.LOW_PRICE, r.VOLUME,
       ]);
     } catch (e) {}
@@ -253,7 +333,8 @@ async function 建自选(全市场映射){
       turnover: 行 ? (行.turnover || 0) : 0,
       vol_ratio: 量比,
       amt_yi: 行 ? (行.amount_yi || 0) : 0,
-      prob: null,
+      /* 由日K自算：区间 / 涨跌超1%概率 / 动量 / 波动 / 置信分 */
+      prob: 算自选概率(kline),
       kline,
       recent5,
     });
