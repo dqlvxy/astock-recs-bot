@@ -109,6 +109,8 @@ function 精简期(g) {
       buy_price: x.buy_price, stop_loss: x.stop_loss, industry: x.industry,
       buy_type: x.buy_type, reasons: x.reasons, tech: x.tech,
       is_main: x.is_main, mode: x.mode,
+      pct: x.pct, pct_chg: x.pct_chg,          /* 荐股日当日涨跌幅：供看板「今日柱子」在无次日数据时兜底 */
+      turnover: x.turnover, vol_ratio: x.vol_ratio,
     })),
   };
 }
