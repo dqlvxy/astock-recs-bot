@@ -1,0 +1,59 @@
+name: 每日稳健版荐股生成
+
+# 北京时间 14:30 = UTC 06:30，周一~周五
+# 注意：GitHub 免费版 cron 可能延迟 5~20 分钟，属正常；也可用 workflow_dispatch 手动补跑
+on:
+  schedule:
+    - cron: "30 6 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write        # 允许把 recs.json 提交回仓库
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 运行稳健版选股并生成 recs.json
+        run: node generate.js
+        env:
+          # 若配了这三个 Secret（且 token 有 KV 权限）则写 KV；否则自动写 recs.json
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
+
+      - name: 提交 recs.json 回仓库
+        run: |
+          if [ ! -f recs.json ]; then
+            echo "未生成 recs.json（可能非交易日），跳过提交"
+            exit 0
+          fi
+          git config user.name "astock-bot"
+          git config user.email "astock-bot@users.noreply.github.com"
+          git add recs.json
+          if git diff --cached --quiet; then
+            echo "recs.json 无变化，无需提交"
+          else
+            git commit -m "chore: 更新荐股存档 $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
+          fi
+
+# 说明：
+#   前端读取地址（二选一，见 README）：
+#     A) jsdelivr CDN（推荐，沙箱/手机均可达）：
+#        https://cdn.jsdelivr.net/gh/<用户名>/astock-recs-bot@main/recs.json
+#     B) raw.githubusercontent（部分网络可能被墙）：
+#        https://raw.githubusercontent.com/<用户名>/astock-recs-bot/main/recs.json
+#   不在此处部署 Pages，避免误覆盖看板页面。
