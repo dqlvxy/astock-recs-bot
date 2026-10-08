@@ -1,0 +1,93 @@
+{
+  "ok": true,
+  "updated": "2026-10-08 16:22:55",
+  "count": 1,
+  "recs": [
+    {
+      "date": "20261008",
+      "gen_time": "2026-10-08 16:22:55",
+      "picks": [
+        {
+          "code": "002382",
+          "name": "蓝帆医疗",
+          "prob": 64.1,
+          "score": 57.4,
+          "buy_price": 6.61,
+          "stop_loss": 5.94,
+          "industry": "",
+          "buy_type": "突破买(B1)",
+          "reasons": {
+            "tech": "MA多头·MACD红4天·量比2.8·换手5.7%",
+            "fund": "ROE 1.3% · 净利同比 179.7%",
+            "msg": "近30天新闻 10 条 · 情感净分 +3"
+          },
+          "is_main": false
+        },
+        {
+          "code": "002780",
+          "name": "三夫户外",
+          "prob": 63.5,
+          "score": 56.4,
+          "buy_price": 15.26,
+          "stop_loss": 13.8,
+          "industry": "",
+          "buy_type": "突破买(B1)",
+          "reasons": {
+            "tech": "MA多头·MACD红8天·量比1.5·换手7.1%",
+            "fund": "ROE 6.6% · 净利同比 216.3%",
+            "msg": "近30天新闻 10 条 · 情感净分 +3"
+          },
+          "is_main": false
+        },
+        {
+          "code": "600573",
+          "name": "惠泉啤酒",
+          "prob": 58.8,
+          "score": 52.2,
+          "buy_price": 10.19,
+          "stop_loss": 9.92,
+          "industry": "",
+          "buy_type": "回踩买(B2)",
+          "reasons": {
+            "tech": "MA多头·MACD红5天·量比2.3·换手8.8%",
+            "fund": "ROE 3.5% · 净利同比 23.3%",
+            "msg": "近30天新闻 10 条 · 情感净分 +3"
+          },
+          "is_main": false
+        },
+        {
+          "code": "603099",
+          "name": "长白山",
+          "prob": 55.3,
+          "score": 48.4,
+          "buy_price": 40.92,
+          "stop_loss": 38.98,
+          "industry": "",
+          "buy_type": "回踩买(B2)",
+          "reasons": {
+            "tech": "MA多头·MACD红8天·量比1.5·换手6.4%",
+            "fund": "ROE 0.1% · 净利同比 161.8%",
+            "msg": "近30天新闻 10 条 · 情感净分 +3"
+          },
+          "is_main": false
+        },
+        {
+          "code": "002833",
+          "name": "弘亚数控",
+          "prob": 52.1,
+          "score": 46,
+          "buy_price": 19.55,
+          "stop_loss": 18.09,
+          "industry": "",
+          "buy_type": "突破买(B1)",
+          "reasons": {
+            "tech": "MA多头·MACD红6天·量比1.7·换手2.7%",
+            "fund": "ROE 8.5% · 净利同比 5.1%",
+            "msg": "近30天新闻 10 条 · 情感净分 +1"
+          },
+          "is_main": false
+        }
+      ]
+    }
+  ]
+}
