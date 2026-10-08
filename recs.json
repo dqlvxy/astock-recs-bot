@@ -1,17 +1,37 @@
 {
   "ok": true,
-  "updated": "2026-10-08 16:22:55",
+  "updated": "2026-10-08 18:02:24",
   "count": 1,
   "recs": [
     {
       "date": "20261008",
-      "gen_time": "2026-10-08 16:22:55",
+      "gen_time": "2026-10-08 18:02:24",
       "picks": [
+        {
+          "code": "002074",
+          "name": "国轩高科",
+          "prob": 47.6,
+          "score": 38.6,
+          "buy_price": 27.74,
+          "stop_loss": 26.49,
+          "industry": "",
+          "buy_type": "回踩买(B2)",
+          "reasons": {
+            "tech": "MA多头·MACD红9天·量比2.5·换手6.9%",
+            "fund": "ROE 4.7% · 净利同比 278.1%",
+            "msg": "快讯提及 0 次 · 无个股新闻"
+          },
+          "is_main": false,
+          "pct": 6.1,
+          "pct_chg": 6.1,
+          "turnover": 6.87,
+          "vol_ratio": 2.5
+        },
         {
           "code": "002382",
           "name": "蓝帆医疗",
-          "prob": 64.1,
-          "score": 57.4,
+          "prob": 44.1,
+          "score": 37.4,
           "buy_price": 6.61,
           "stop_loss": 5.94,
           "industry": "",
@@ -19,73 +39,73 @@
           "reasons": {
             "tech": "MA多头·MACD红4天·量比2.8·换手5.7%",
             "fund": "ROE 1.3% · 净利同比 179.7%",
-            "msg": "近30天新闻 10 条 · 情感净分 +3"
+            "msg": "快讯提及 0 次 · 无个股新闻"
           },
-          "is_main": false
+          "is_main": false,
+          "pct": 4.11,
+          "pct_chg": 4.11,
+          "turnover": 5.66,
+          "vol_ratio": 2.77
         },
         {
-          "code": "002780",
-          "name": "三夫户外",
-          "prob": 63.5,
-          "score": 56.4,
-          "buy_price": 15.26,
-          "stop_loss": 13.8,
+          "code": "601579",
+          "name": "会稽山",
+          "prob": 43.7,
+          "score": 37.2,
+          "buy_price": 36.93,
+          "stop_loss": 26.69,
+          "industry": "",
+          "buy_type": "回踩买(B2)",
+          "reasons": {
+            "tech": "MA多头·MACD红46天·量比1.2·换手12.3%",
+            "fund": "ROE 3.4% · 净利同比 37%",
+            "msg": "快讯提及 0 次 · 无个股新闻"
+          },
+          "is_main": false,
+          "pct": 6.17,
+          "pct_chg": 6.17,
+          "turnover": 12.3,
+          "vol_ratio": 1.23
+        },
+        {
+          "code": "300890",
+          "name": "翔丰华",
+          "prob": 46.2,
+          "score": 37.2,
+          "buy_price": 29.38,
+          "stop_loss": 26.31,
           "industry": "",
           "buy_type": "突破买(B1)",
           "reasons": {
-            "tech": "MA多头·MACD红8天·量比1.5·换手7.1%",
-            "fund": "ROE 6.6% · 净利同比 216.3%",
-            "msg": "近30天新闻 10 条 · 情感净分 +3"
+            "tech": "MA多头·MACD红10天·量比2.5·换手19.2%",
+            "fund": "ROE 2.2% · 净利同比 1828.1%",
+            "msg": "快讯提及 0 次 · 无个股新闻"
           },
-          "is_main": false
+          "is_main": false,
+          "pct": 1.21,
+          "pct_chg": 1.21,
+          "turnover": 19.2,
+          "vol_ratio": 2.52
         },
         {
-          "code": "600573",
-          "name": "惠泉啤酒",
-          "prob": 58.8,
-          "score": 52.2,
+          "code": "002728",
+          "name": "特一药业",
+          "prob": 46.7,
+          "score": 37,
           "buy_price": 10.19,
-          "stop_loss": 9.92,
-          "industry": "",
-          "buy_type": "回踩买(B2)",
-          "reasons": {
-            "tech": "MA多头·MACD红5天·量比2.3·换手8.8%",
-            "fund": "ROE 3.5% · 净利同比 23.3%",
-            "msg": "近30天新闻 10 条 · 情感净分 +3"
-          },
-          "is_main": false
-        },
-        {
-          "code": "603099",
-          "name": "长白山",
-          "prob": 55.3,
-          "score": 48.4,
-          "buy_price": 40.92,
-          "stop_loss": 38.98,
-          "industry": "",
-          "buy_type": "回踩买(B2)",
-          "reasons": {
-            "tech": "MA多头·MACD红8天·量比1.5·换手6.4%",
-            "fund": "ROE 0.1% · 净利同比 161.8%",
-            "msg": "近30天新闻 10 条 · 情感净分 +3"
-          },
-          "is_main": false
-        },
-        {
-          "code": "002833",
-          "name": "弘亚数控",
-          "prob": 52.1,
-          "score": 46,
-          "buy_price": 19.55,
-          "stop_loss": 18.09,
+          "stop_loss": 9.23,
           "industry": "",
           "buy_type": "突破买(B1)",
           "reasons": {
-            "tech": "MA多头·MACD红6天·量比1.7·换手2.7%",
-            "fund": "ROE 8.5% · 净利同比 5.1%",
-            "msg": "近30天新闻 10 条 · 情感净分 +1"
+            "tech": "MA多头·MACD红17天·量比2.9·换手9.3%",
+            "fund": "ROE 1.7% · 净利同比 -18.2%",
+            "msg": "快讯提及 0 次 · 无个股新闻"
           },
-          "is_main": false
+          "is_main": false,
+          "pct": 0.3,
+          "pct_chg": 0.3,
+          "turnover": 9.33,
+          "vol_ratio": 2.87
         }
       ]
     }
