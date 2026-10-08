@@ -1,4 +1,4 @@
-name: 每日稳健版荐股生成
+name: 每日稳健版荐股 + 全模块快照
 
 # 北京时间 14:30 = UTC 06:30，周一~周五
 # 注意：GitHub 免费版 cron 可能延迟 5~20 分钟，属正常；也可用 workflow_dispatch 手动补跑
@@ -8,12 +8,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write        # 允许把 recs.json 提交回仓库
+  contents: write        # 允许把 recs.json / today.json / watch.json 提交回仓库
 
 jobs:
   generate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -26,6 +26,7 @@ jobs:
       - name: 安装依赖
         run: npm ci
 
+      # ── ① 尾盘荐股：产出 recs.json（历史存档，多期累积）──────────────
       - name: 运行稳健版选股并生成 recs.json
         run: node generate.js
         env:
@@ -34,26 +35,63 @@ jobs:
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CF_KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
 
-      - name: 提交 recs.json 回仓库
+      # ── ② 全模块快照：产出 today.json（当日覆盖）+ watch.json（自选行情）
+      #     覆盖前端 T1D 内嵌快照的 12 个字段：index / market_stat / zt_total /
+      #     ladder / lhb / yaogu / hit_total / temperature / main_lines / trade_date …
+      #     自选清单从 watchlist.json 读（不存在则用内置兜底 7 只），
+      #     个股走东财全市场、ETF/LOF 走腾讯行情补齐名称与换手。
+      - name: 生成全模块云端快照 today.json + watch.json
+        run: node today.js
+        env:
+          TODAY_FILE: today.json
+          WATCH_FILE: watchlist.json
+
+      # ── ③ 把三份产物提交回仓库（jsdelivr 即可直接分发）──────────────
+      - name: 提交快照文件回仓库
         run: |
-          if [ ! -f recs.json ]; then
-            echo "未生成 recs.json（可能非交易日），跳过提交"
-            exit 0
-          fi
           git config user.name "astock-bot"
           git config user.email "astock-bot@users.noreply.github.com"
-          git add recs.json
+
+          提交了=0
+          for f in recs.json today.json watch.json; do
+            if [ -f "$f" ]; then
+              git add "$f"
+              提交了=1
+            else
+              echo "$f 不存在（可能非交易日），跳过"
+            fi
+          done
+
+          if [ "$提交了" = "0" ]; then
+            echo "没有任何快照文件可提交"
+            exit 0
+          fi
+
           if git diff --cached --quiet; then
-            echo "recs.json 无变化，无需提交"
+            echo "文件无变化，无需提交"
           else
-            git commit -m "chore: 更新荐股存档 $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git commit -m "chore: 更新荐股存档与全模块快照 $(date -u +'%Y-%m-%d %H:%M UTC')"
             git push
           fi
 
+      # ── ④ 上传产物，便于手动下载检查 ───────────────────────────────
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: astock-snapshots
+          path: |
+            recs.json
+            today.json
+            watch.json
+          if-no-files-found: warn
+          retention-days: 7
+
 # 说明：
-#   前端读取地址（二选一，见 README）：
-#     A) jsdelivr CDN（推荐，沙箱/手机均可达）：
-#        https://cdn.jsdelivr.net/gh/<用户名>/astock-recs-bot@main/recs.json
-#     B) raw.githubusercontent（部分网络可能被墙）：
-#        https://raw.githubusercontent.com/<用户名>/astock-recs-bot/main/recs.json
+#   前端读取地址（jsdelivr CDN，沙箱/手机均可达）：
+#     recs.json   https://cdn.jsdelivr.net/gh/<用户名>/astock-recs-bot@main/recs.json
+#     today.json  https://cdn.jsdelivr.net/gh/<用户名>/astock-recs-bot@main/today.json
+#     watch.json  https://cdn.jsdelivr.net/gh/<用户名>/astock-recs-bot@main/watch.json
+#   看板页面同源优先（Cloudflare Pages 根目录的 today.json / watch.json），
+#   同源 404（如本地 file:// 打开）时自动回退到上面的 jsdelivr 地址。
 #   不在此处部署 Pages，避免误覆盖看板页面。
