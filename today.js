@@ -253,14 +253,22 @@ function 算自选概率(kline) {
 
     const 动 = (cl[n - 1] / cl[Math.max(0, n - 6)] - 1) * 100;
 
-    /* 标准正态 CDF（Abramowitz-Stegun 近似） */
+    /* 标准正态累积分布函数 Φ(z)
+     * ── 为什么不用 Abramowitz-Stegun 近似 ──
+     * 该近似的标准式是 Φ(z) = 1 − φ(z)·(a₁t+…)（φ 为密度、t=1/(1+p|z|)）。
+     * 若漏掉密度因子按多项式直接取值，误差可达 2%~8%，
+     * 会把上涨概率系统性高估。改用 erf 展开（Numerical Recipes 口径），
+     * 绝对误差 < 1e-7，与前端 自算自选概率() 完全同口径。 */
     const 正态 = (z) => {
-      const 符 = z < 0 ? -1 : 1, x = Math.abs(z);
-      const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741,
-            a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
-      const t = 1 / (1 + p * x);
-      const y = 1 - ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
-      return 0.5 * (1 + 符 * y);
+      const 误差函数 = (x) => {
+        const 符 = x < 0 ? -1 : 1, a = Math.abs(x);
+        const t = 1 / (1 + 0.5 * a);
+        const 多项式 = t * Math.exp(-a * a - 1.26551223 + t * (1.00002368 + t * (0.37409196 +
+          t * (0.09678418 + t * (-0.18628806 + t * (0.27886807 + t * (-1.13520398 +
+          t * (1.48851587 + t * (-0.82215223 + t * 0.17087277)))))))));
+        return 符 * (1 - 多项式);
+      };
+      return 0.5 * (1 + 误差函数(z / Math.SQRT2));
     };
     const 取整 = (x, d) => { const q = Math.pow(10, d); return Math.round(x * q) / q; };
 
