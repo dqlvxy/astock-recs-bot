@@ -75,8 +75,9 @@ jobs:
           fi
 
       # ── ③' 刷新 jsDelivr CDN 缓存（关键，别删）────────────────────
-      # 前端只读 CDN。推完仓库后 CDN 不会立刻更新（@main 缓存最长 7 天），
-      # 必须显式 purge，否则看板会一直显示旧数据。全部用 ASCII 变量名。
+      # 前端优先读「提交哈希地址」（内容寻址，永远不会陈旧），本步骤是保底：
+      # 分支地址 @main 仍被部分场景读到，purge 能刷就刷。
+      # 注意：实测分支缓存 purge 后仍可能返回旧内容，所以哈希地址才是主路径。
       - name: 刷新 jsDelivr CDN 缓存
         run: |
           for f in recs.json today.json watch.json; do
@@ -89,6 +90,27 @@ jobs:
             fi
           done
           echo "缓存刷新请求已发出（200 表示受理）"
+
+      # ── ③'' 把本次提交哈希写回看板页面（关键，别删）─────────────────
+      # 看板前端优先请求 @<提交哈希> 地址：jsDelivr 的分支地址 @main 会被
+      # 边缘节点长期缓存旧版本，连 purge 都清不掉，导致看板展示过期数字。
+      # 哈希地址是内容寻址，拿到的一定是本次提交的最新内容。
+      # 这里把页面里的占位符 __BUILD_COMMIT__ 替换成真实短哈希，
+      # 再由下一步部署到 Cloudflare Pages。
+      - name: 把提交哈希注入看板页面
+        run: |
+          HASH=$(git rev-parse --short HEAD)
+          echo "本次提交哈希：$HASH"
+          # 看板页面可能在仓库根的 index.html，也可能由 Pages 项目单独维护；
+          # 存在才替换，不存在则跳过（不报错）。
+          for p in index.html board/index.html public/index.html; do
+            if [ -f "$p" ]; then
+              sed -i "s/__BUILD_COMMIT__/$HASH/g" "$p"
+              echo "已写入 $p"
+            fi
+          done
+          echo "$HASH" > .build-commit
+          echo "哈希文件已生成（供外部部署脚本读取）"
 
       # ── ④ 上传产物，便于手动下载检查 ───────────────────────────────
       - name: 上传产物
@@ -105,9 +127,8 @@ jobs:
 
 # 说明：
 #   前端读取地址（jsdelivr CDN，沙箱/手机均可达）：
-#     recs.json   https://cdn.jsdelivr.net/gh/<用户名>/astock-recs-bot@main/recs.json
-#     today.json  https://cdn.jsdelivr.net/gh/<用户名>/astock-recs-bot@main/today.json
-#     watch.json  https://cdn.jsdelivr.net/gh/<用户名>/astock-recs-bot@main/watch.json
-#   看板页面同源优先（Cloudflare Pages 根目录的 today.json / watch.json），
-#   同源 404（如本地 file:// 打开）时自动回退到上面的 jsdelivr 地址。
+#     优先  https://cdn.jsdelivr.net/gh/<用户名>/astock-recs-bot@<提交哈希>/xxx.json
+#     回退  https://cdn.jsdelivr.net/gh/<用户名>/astock-recs-bot@main/xxx.json
+#   为什么优先哈希：分支地址会被 CDN 边缘长期缓存旧版且 purge 无效，
+#   哈希地址内容寻址、永不陈旧。
 #   不在此处部署 Pages，避免误覆盖看板页面。
