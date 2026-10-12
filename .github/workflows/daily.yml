@@ -47,22 +47,28 @@ jobs:
           WATCH_FILE: watchlist.json
 
       # ── ③ 把三份产物提交回仓库（jsdelivr 即可直接分发）──────────────
+      # ⚠ 本步骤所有 shell 变量必须用 ASCII 名，禁用中文变量名。
+      #   Actions runner 的 sh 走 POSIX 模式，中文变量名会被当成命令，
+      #   报 "xxx=0: command not found" 并以 exit 127 终止 ——
+      #   实测 2026-10-09 / 10-12 两次运行都死在这里：选股与快照都生成成功，
+      #   却因提交失败导致数据进不了仓库，看板走势图长期停在旧数据。
+      #   修复前曾误以为只影响自检脚本，实际 workflow 同样中招，勿再踩。
       - name: 提交快照文件回仓库
         run: |
           git config user.name "astock-bot"
           git config user.email "astock-bot@users.noreply.github.com"
 
-          提交了=0
+          HAS_FILE=0
           for f in recs.json today.json watch.json; do
             if [ -f "$f" ]; then
               git add "$f"
-              提交了=1
+              HAS_FILE=1
             else
               echo "$f 不存在（可能非交易日），跳过"
             fi
           done
 
-          if [ "$提交了" = "0" ]; then
+          if [ "$HAS_FILE" = "0" ]; then
             echo "没有任何快照文件可提交"
             exit 0
           fi
@@ -71,7 +77,9 @@ jobs:
             echo "文件无变化，无需提交"
           else
             git commit -m "chore: 更新荐股存档与全模块快照 $(date -u +'%Y-%m-%d %H:%M UTC')"
-            git push
+            # 先 rebase 再推：避免与沙箱/手动提交并发时 non-fast-forward 被拒
+            git pull --rebase --autostash origin main || true
+            git push origin main
           fi
 
       # ── ③' 刷新 jsDelivr CDN 缓存（关键，别删）────────────────────
