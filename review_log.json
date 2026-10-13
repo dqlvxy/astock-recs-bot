@@ -1,0 +1,135 @@
+{
+  "ok": true,
+  "updated": "2026-10-13 15:48:47",
+  "count": 2,
+  "items": [
+    {
+      "date": "20261008",
+      "gen_time": "2026-10-08 18:02:24",
+      "picks": [
+        {
+          "code": "002074",
+          "name": "国轩高科",
+          "score": 38.6,
+          "prob": 47.6,
+          "chg": 6.1,
+          "vr": 2.5,
+          "turn": 6.87,
+          "near_limit_up": null,
+          "ret": -2.84
+        },
+        {
+          "code": "002382",
+          "name": "蓝帆医疗",
+          "score": 37.4,
+          "prob": 44.1,
+          "chg": 4.11,
+          "vr": 2.77,
+          "turn": 5.66,
+          "near_limit_up": null,
+          "ret": 3.19
+        },
+        {
+          "code": "601579",
+          "name": "会稽山",
+          "score": 37.2,
+          "prob": 43.7,
+          "chg": 6.17,
+          "vr": 1.23,
+          "turn": 12.3,
+          "near_limit_up": null,
+          "ret": 1.72
+        },
+        {
+          "code": "300890",
+          "name": "翔丰华",
+          "score": 37.2,
+          "prob": 46.2,
+          "chg": 1.21,
+          "vr": 2.52,
+          "turn": 19.2,
+          "near_limit_up": null,
+          "ret": 0.82
+        },
+        {
+          "code": "002728",
+          "name": "特一药业",
+          "score": 37,
+          "prob": 46.7,
+          "chg": 0.3,
+          "vr": 2.87,
+          "turn": 9.33,
+          "near_limit_up": null,
+          "ret": 3.02
+        }
+      ],
+      "verifiable": true,
+      "market_chg": 1.8150388936905708,
+      "success": 4
+    },
+    {
+      "date": "20261012",
+      "gen_time": "2026-10-12 08:57:36",
+      "picks": [
+        {
+          "code": "300821",
+          "name": "东岳硅材",
+          "score": 42.8,
+          "prob": 51,
+          "chg": 4.9,
+          "vr": 4.28,
+          "turn": 18.75,
+          "near_limit_up": null,
+          "ret": 7
+        },
+        {
+          "code": "002058",
+          "name": "紫竹高科",
+          "score": 41.8,
+          "prob": 55.8,
+          "chg": 3.52,
+          "vr": 8.74,
+          "turn": 23,
+          "near_limit_up": null,
+          "ret": -10
+        },
+        {
+          "code": "300471",
+          "name": "厚普股份",
+          "score": 41.4,
+          "prob": 50.3,
+          "chg": 6.08,
+          "vr": 4.23,
+          "turn": 6.51,
+          "near_limit_up": null,
+          "ret": -1.85
+        },
+        {
+          "code": "001328",
+          "name": "登康口腔",
+          "score": 37.2,
+          "prob": 46,
+          "chg": 4.42,
+          "vr": 2.39,
+          "turn": 2.2,
+          "near_limit_up": null,
+          "ret": -3.24
+        },
+        {
+          "code": "603883",
+          "name": "老百姓",
+          "score": 37,
+          "prob": 44.3,
+          "chg": 4.95,
+          "vr": 3.45,
+          "turn": 3.89,
+          "near_limit_up": null,
+          "ret": 1.69
+        }
+      ],
+      "verifiable": true,
+      "market_chg": 1.2079378774805916,
+      "success": 2
+    }
+  ]
+}

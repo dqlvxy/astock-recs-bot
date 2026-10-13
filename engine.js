@@ -3,6 +3,27 @@
 // 纯计算 + 公开行情接口；去除了所有 window/DOM 依赖；gbk 解码用 iconv-lite。
 // 输出结构对齐前端「拉后端存档 / 合并十日荐股」契约：{ date, gen_time, picks, temperature, main_lines }
 import iconv from "iconv-lite";
+import { readFileSync, existsSync } from "node:fs";
+
+/* ── 动态参数：读取 review.js 每日收盘后生成的 params.json（自动复盘优化）──
+   滚动成功率低 → 引擎自动温和收紧硬门槛；全部带硬上下限，防止过度激进。
+   params.json 不存在时用默认值（即原引擎阈值）。 */
+let CFG = 读动态参数();
+function 读动态参数() {
+  const def = { 追高上限: 5, 量比下限: 1, 量比上限: 5, 换手下限: 2, 换手上限: 20, 温度下限: 35, 连板阈值: 2, 止损率: 0.92 };
+  const 钳 = (v, lo, hi) => (typeof v === "number" && isFinite(v) ? Math.min(hi, Math.max(lo, v)) : null);
+  try {
+    if (existsSync("params.json")) {
+      const p = JSON.parse(readFileSync("params.json", "utf-8"));
+      const c = p && typeof p === "object" ? (p.cfg || p) : {};
+      const v = (k, lo, hi) => { const x = 钳(c[k], lo, hi); if (x != null) def[k] = Math.round(x * 100) / 100; };
+      v("追高上限", 2, 6); v("量比下限", 0.5, 4); v("量比上限", 3, 8);
+      v("换手下限", 0.5, 10); v("换手上限", 10, 35); v("温度下限", 30, 50);
+      v("连板阈值", 1, 5); v("止损率", 0.85, 0.97);
+    }
+  } catch (e) {}
+  return def;
+}
 
 const UA =
   "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36";
@@ -464,9 +485,9 @@ function scan(cands, ztCodes) {
       fmv = r.f21 ? r.f21 / 1e8 : 0;
     if (price == null || price <= 0) continue;
     if (chg == null || chg <= 0) continue; // 当日红盘
-    if (chg >= 5) continue; // 追高过滤：当日已涨>=5% 不追（避免次日接盘）
-    if (vr == null || vr < 1 || vr > 5) continue; // 量比 1-5（>5 情绪票剔除）
-    if (turn == null || turn < 2 || turn > 20) continue; // 换手 2-20（>20 情绪票剔除）
+    if (chg >= CFG.追高上限) continue; // 追高过滤：当日已涨>=上限% 不追（避免次日接盘，上限由复盘自适应）
+    if (vr == null || vr < CFG.量比下限 || vr > CFG.量比上限) continue; // 量比区间（情绪票剔除，区间由复盘自适应）
+    if (turn == null || turn < CFG.换手下限 || turn > CFG.换手上限) continue; // 换手区间（情绪票剔除，区间由复盘自适应）
     if (fmv < 20 || fmv > 800) continue; // 流通市值 20-800亿
     if (price > 50) continue; // 股价 <= 50
     if (name.indexOf("ST") >= 0 || name.indexOf("*") >= 0 || name.indexOf("N") === 0 || name.indexOf("退") >= 0) continue;
@@ -574,7 +595,7 @@ function hardFilter(pool, klineMap) {
       const 昨 = closes[i - 1];
       if (昨 > 0 && (closes[i] - 昨) / 昨 >= 涨停线 * 0.98) 近5涨停++;
     }
-    if (近5涨停 >= 2) continue;
+    if (近5涨停 >= CFG.连板阈值) continue; // 连板/接近连板剔除阈值（复盘自适应）
     if (!(ma5 > ma10 && ma10 > ma30)) continue; // 均线多头
     if (!(ma5 > ma5p && ma10 > ma10p && ma30 > ma30p)) continue; // 同步上行
     const last = closes[closes.length - 1];
@@ -758,7 +779,7 @@ function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已�
     else if (p.chg < 5 && p.vr > 1.5) buyType = "突破买(B1)";
     else buyType = "回踩买(B2)";
     const buyPrice = buyType === "突破买(B1)" ? Math.round(it.h20 * 1.005 * 100) / 100 : Math.round(it.ma10 * 1.005 * 100) / 100;
-    let stop = Math.round(buyPrice * 0.92 * 100) / 100; // 统一止损 -8%（不再按20日高点/30日均线浮动，避免紫竹那种31%宽止损裸奔）
+    let stop = Math.round(buyPrice * CFG.止损率 * 100) / 100; // 统一止损（止损率由复盘自适应，默认 -8%）
     const prob = Math.round(Math.min(92, Math.max(20, score + Math.min(8, (p.vr - 1) * 2) + Math.min(6, it.redDays * 0.8))) * 10) / 10;
     picks.push({
       code: p.code,
@@ -876,7 +897,7 @@ async function runStable(prog, 已推码集) {
     zbMap = A[3];
   const zbN = Object.keys(zbMap).length;
   const temp = temperature(idxs, zt, dtN, zbN);
-  if (temp.temp < 35) {
+  if (temp.temp < CFG.温度下限) { // 弱市停推温度下限（复盘自适应）
     P(18, "市场温度 " + temp.temp + " 分（" + temp.state + "），弱市停推");
     return 空仓("市场温度 " + temp.temp + "（" + temp.state + "），大盘弱势降频停推，避免逆势追高");
   }
