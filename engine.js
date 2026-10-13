@@ -567,6 +567,9 @@ function hardFilter(pool, klineMap) {
       ma10p = calcMA(closes.slice(0, -1), 10),
       ma30p = calcMA(closes.slice(0, -1), 30);
     if (ma5 == null || ma10 == null || ma30 == null || ma5p == null) continue;
+    const 近5涨 = closes.length >= 6 ? ((closes[closes.length - 1] - closes[closes.length - 6]) / closes[closes.length - 6]) * 100 : 0;
+    const 近10涨 = closes.length >= 11 ? ((closes[closes.length - 1] - closes[closes.length - 11]) / closes[closes.length - 11]) * 100 : 0;
+    if (近5涨 > 25 || 近10涨 > 40) continue; // 斜率过滤：近5日涨>25% 或 近10日涨>40% 视为斜率过陡，剔除追高接盘
     if (!(ma5 > ma10 && ma10 > ma30)) continue; // 均线多头
     if (!(ma5 > ma5p && ma10 > ma10p && ma30 > ma30p)) continue; // 同步上行
     const last = closes[closes.length - 1];
