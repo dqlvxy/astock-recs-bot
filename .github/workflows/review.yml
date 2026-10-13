@@ -1,0 +1,85 @@
+name: 每日收盘复盘 + 策略自动优化
+
+# A股收盘 15:00，复盘 15:30 跑：验证上期荐股「次日收盘」表现 → 归因失败 → 生成优化参数
+# 北京时间 15:30 = UTC 07:30，周一~周五
+on:
+  schedule:
+    - cron: "30 7 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write        # 允许把 review_log.json / params.json / review.md 提交回仓库
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: 安装依赖
+        run: npm ci
+
+      # ── ① 收盘复盘：读 recs.json → 验证上期次日收盘 → 归因 → 产出 review_log.json / params.json / review.md ──
+      - name: 运行收盘复盘脚本
+        run: node review.js
+
+      # ── ② 提交复盘产物回仓库（jsDelivr 分发）──────────────
+      # 注：Actions runner 的 sh 走 POSIX，shell 变量一律用 ASCII 名，禁用中文变量名。
+      - name: 提交复盘产物
+        run: |
+          git config user.name "astock-bot"
+          git config user.email "astock-bot@users.noreply.github.com"
+
+          HAS_FILE=0
+          for f in review_log.json params.json review.md; do
+            if [ -f "$f" ]; then
+              git add "$f"
+              HAS_FILE=1
+            else
+              echo "$f 不存在，跳过"
+            fi
+          done
+
+          if [ "$HAS_FILE" = "0" ]; then
+            echo "没有复盘产物可提交"
+            exit 0
+          fi
+
+          if git diff --cached --quiet; then
+            echo "文件无变化，无需提交"
+          else
+            git commit -m "chore: 每日收盘复盘与策略自动优化 $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git pull --rebase --autostash origin main || true
+            git push origin main
+          fi
+
+      # ── ③ 刷新 jsDelivr CDN 缓存（保底；前端主路径是提交哈希地址）──────────────
+      - name: 刷新 CDN 缓存
+        run: |
+          for f in review_log.json params.json review.md; do
+            if [ -f "$f" ]; then
+              code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "https://purge.jsdelivr.net/gh/${{ github.repository }}@main/$f" || echo "000")
+              echo "$f -> HTTP $code"
+            fi
+          done
+          echo "缓存刷新请求已发出（200 表示受理）"
+
+      # ── ④ 上传产物，便于手动下载检查 ─────────────────────────────
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: astock-review
+          path: |
+            review_log.json
+            params.json
+            review.md
+          if-no-files-found: warn
+          retention-days: 7
