@@ -567,9 +567,14 @@ function hardFilter(pool, klineMap) {
       ma10p = calcMA(closes.slice(0, -1), 10),
       ma30p = calcMA(closes.slice(0, -1), 30);
     if (ma5 == null || ma10 == null || ma30 == null || ma5p == null) continue;
-    const 近5涨 = closes.length >= 6 ? ((closes[closes.length - 1] - closes[closes.length - 6]) / closes[closes.length - 6]) * 100 : 0;
-    const 近10涨 = closes.length >= 11 ? ((closes[closes.length - 1] - closes[closes.length - 11]) / closes[closes.length - 11]) * 100 : 0;
-    if (近5涨 > 25 || 近10涨 > 40) continue; // 斜率过滤：近5日涨>25% 或 近10日涨>40% 视为斜率过陡，剔除追高接盘
+    // 接近连板过滤：近5个交易日出现≥2次涨停/接近涨停（按板块涨停线）即视为连板/接近连板，剔除追高接盘
+    const 涨停线 = p.code.charAt(0) === "3" || p.code.startsWith("688") ? 0.198 : 0.098;
+    let 近5涨停 = 0;
+    for (let i = closes.length - 1; i >= Math.max(0, closes.length - 5); i--) {
+      const 昨 = closes[i - 1];
+      if (昨 > 0 && (closes[i] - 昨) / 昨 >= 涨停线 * 0.98) 近5涨停++;
+    }
+    if (近5涨停 >= 2) continue;
     if (!(ma5 > ma10 && ma10 > ma30)) continue; // 均线多头
     if (!(ma5 > ma5p && ma10 > ma10p && ma30 > ma30p)) continue; // 同步上行
     const last = closes[closes.length - 1];
