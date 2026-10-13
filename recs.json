@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "updated": "2026-10-12 08:57:36",
-  "count": 2,
+  "updated": "2026-10-13 06:53:59",
+  "count": 3,
   "recs": [
     {
       "date": "20261008",
@@ -212,6 +212,112 @@
           "pct_chg": 4.95,
           "turnover": 3.89,
           "vol_ratio": 3.45
+        }
+      ]
+    },
+    {
+      "date": "20261013",
+      "gen_time": "2026-10-13 06:53:59",
+      "picks": [
+        {
+          "code": "601900",
+          "name": "南方传媒",
+          "prob": 52.2,
+          "score": 48.4,
+          "buy_price": 13.41,
+          "stop_loss": 12.34,
+          "industry": "",
+          "buy_type": "突破买(B1)",
+          "reasons": {
+            "tech": "MA多头·MACD红3天·量比1.7·换手2.8%",
+            "fund": "ROE 5.2% · 净利同比 5.3%",
+            "msg": "近30天新闻 10 条 · 情感净分 +3"
+          },
+          "is_main": false,
+          "pct": 0.68,
+          "pct_chg": 0.68,
+          "turnover": 2.82,
+          "vol_ratio": 1.7
+        },
+        {
+          "code": "603209",
+          "name": "兴通股份",
+          "prob": 52.4,
+          "score": 48.4,
+          "buy_price": 15.26,
+          "stop_loss": 14.04,
+          "industry": "",
+          "buy_type": "突破买(B1)",
+          "reasons": {
+            "tech": "MA多头·MACD红3天·量比1.8·换手2.9%",
+            "fund": "ROE 6.2% · 净利同比 57.1%",
+            "msg": "近30天新闻 10 条 · 情感净分 +2"
+          },
+          "is_main": false,
+          "pct": 2.08,
+          "pct_chg": 2.08,
+          "turnover": 2.9,
+          "vol_ratio": 1.8
+        },
+        {
+          "code": "301015",
+          "name": "百洋医药",
+          "prob": 54.3,
+          "score": 47,
+          "buy_price": 26.59,
+          "stop_loss": 24.46,
+          "industry": "",
+          "buy_type": "突破买(B1)",
+          "reasons": {
+            "tech": "MA多头·MACD红11天·量比1.7·换手2.3%",
+            "fund": "ROE 9.3% · 净利同比 37.7%",
+            "msg": "近30天新闻 10 条 · 情感净分 0"
+          },
+          "is_main": false,
+          "pct": 1.77,
+          "pct_chg": 1.77,
+          "turnover": 2.29,
+          "vol_ratio": 1.65
+        },
+        {
+          "code": "300133",
+          "name": "华策影视",
+          "prob": 52.6,
+          "score": 46.2,
+          "buy_price": 7.98,
+          "stop_loss": 7.34,
+          "industry": "",
+          "buy_type": "回踩买(B2)",
+          "reasons": {
+            "tech": "MA多头·MACD红9天·量比1.2·换手9.8%",
+            "fund": "ROE 2.3% · 净利同比 42%",
+            "msg": "近30天新闻 10 条 · 情感净分 +3"
+          },
+          "is_main": false,
+          "pct": 1.32,
+          "pct_chg": 1.32,
+          "turnover": 9.78,
+          "vol_ratio": 1.2
+        },
+        {
+          "code": "002712",
+          "name": "思美传媒",
+          "prob": 48.5,
+          "score": 45.4,
+          "buy_price": 5.51,
+          "stop_loss": 5.07,
+          "industry": "",
+          "buy_type": "突破买(B1)",
+          "reasons": {
+            "tech": "MA多头·MACD红2天·量比1.7·换手6.3%",
+            "fund": "ROE 0.1% · 净利同比 108.9%",
+            "msg": "近30天新闻 10 条 · 情感净分 +3"
+          },
+          "is_main": false,
+          "pct": 2.62,
+          "pct_chg": 2.62,
+          "turnover": 6.31,
+          "vol_ratio": 1.74
         }
       ]
     }
