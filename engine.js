@@ -531,7 +531,7 @@ function macdSeries(closes) {
     deaArr.push(dea);
     histArr.push(2 * (dif - dea));
   }
-  return { dif: difArr[n - 1], dea: deaArr[n - 1], hist: histArr[n - 1], histArr };
+  return { dif: difArr[n - 1], dea: deaArr[n - 1], hist: histArr[n - 1], histArr, histPrev: n >= 2 ? histArr[n - 2] : null };
 }
 /* B3 涨停回调形态识别：近10日内曾涨停、其后缩量回调、且不破MA10 */
 function detect涨停回调(rows, closes, ma10) {
@@ -601,8 +601,10 @@ function hardFilter(pool, klineMap) {
     const last = closes[closes.length - 1];
     const mc = macdSeries(closes);
     const 红柱 = !!(mc && mc.dif > mc.dea && mc.hist > 0);
+    // MACD 红柱必须处于「加长阶段」：当前红柱 > 前一根红柱（动能增强）；缩短阶段剔除，避免强弩之末
+    const 红柱加长 = !!(红柱 && mc.histPrev != null && mc.hist > mc.histPrev);
     const 涨停回调 = detect涨停回调(rows, closes, ma10);
-    if (!((last >= ma5 && 红柱) || 涨停回调)) continue;
+    if (!((last >= ma5 && 红柱加长) || 涨停回调)) continue;
     let redDays = 0;
     if (mc && mc.histArr)
       for (let d = mc.histArr.length - 1; d >= 0; d--) {
@@ -611,7 +613,7 @@ function hardFilter(pool, klineMap) {
       }
     let h20 = 0;
     for (let h = Math.max(0, closes.length - 20); h < closes.length; h++) if (closes[h] > h20) h20 = closes[h];
-    out.push({ p, ma5, ma10, ma30, redDays, h20, 涨停回调 });
+    out.push({ p, ma5, ma10, ma30, redDays, h20, 涨停回调, 红柱加长 });
   }
   return out;
 }
@@ -814,7 +816,7 @@ function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已�
       turnover: Math.round(p.turn * 100) / 100,
       vol_ratio: Math.round(p.vr * 100) / 100,
       reasons: {
-        tech: "MA多头·MACD红" + it.redDays + "天·量比" + Math.min(99, Math.round(p.vr * 10) / 10) + "·换手" + Math.round(p.turn * 10) / 10 + "%" + (it.涨停回调 ? "·涨停回调(" + it.涨停回调.回调天数 + "日内涨停,缩量" + it.涨停回调.缩量比 + "%)" : ""),
+        tech: "MA多头·MACD" + (it.红柱加长 ? "红柱加长" : (it.redDays > 0 ? "红柱缩短" : "无红柱")) + (it.redDays > 0 ? "·红" + it.redDays + "天" : "") + "·量比" + Math.min(99, Math.round(p.vr * 10) / 10) + "·换手" + Math.round(p.turn * 10) / 10 + "%" + (it.涨停回调 ? "·涨停回调(" + it.涨停回调.回调天数 + "日内涨停,缩量" + it.涨停回调.缩量比 + "%)" : ""),
         fund: "ROE " + Math.round(roe * 10) / 10 + "% · 净利同比 " + (yoy == null ? "-" : Math.round(yoy * 10) / 10 + "%"),
         msg: sn.n > 0 ? "近30天新闻 " + sn.n + " 条 · 情感净分 " + (sn.senti > 0 ? "+" : "") + sn.senti : flashOk ? "快讯提及 " + n + " 次 · 无个股新闻" : "无近期新闻，按基准分",
       },
