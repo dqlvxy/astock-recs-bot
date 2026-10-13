@@ -464,8 +464,9 @@ function scan(cands, ztCodes) {
       fmv = r.f21 ? r.f21 / 1e8 : 0;
     if (price == null || price <= 0) continue;
     if (chg == null || chg <= 0) continue; // 当日红盘
-    if (vr == null || vr < 1) continue; // 量比 >= 1
-    if (turn == null || turn < 2 || turn > 25) continue; // 换手 2-25
+    if (chg >= 5) continue; // 追高过滤：当日已涨>=5% 不追（避免次日接盘）
+    if (vr == null || vr < 1 || vr > 5) continue; // 量比 1-5（>5 情绪票剔除）
+    if (turn == null || turn < 2 || turn > 20) continue; // 换手 2-20（>20 情绪票剔除）
     if (fmv < 20 || fmv > 800) continue; // 流通市值 20-800亿
     if (price > 50) continue; // 股价 <= 50
     if (name.indexOf("ST") >= 0 || name.indexOf("*") >= 0 || name.indexOf("N") === 0 || name.indexOf("退") >= 0) continue;
@@ -728,6 +729,7 @@ function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已�
         break;
       }
     }
+    if (yoy != null && yoy < 0) continue; // 基本面过滤：净利同比为负 一票否决（规避业绩下滑/雷股）
     /* ── 三维打分（各 10 分满分）· 细项可追溯 ──
        权重：技术面 40% + 消息面 40% + 基本面 20%，综合分 = 三者加权 × 10（满分 100） */
     const n = news[p.name] || 0;
@@ -748,8 +750,7 @@ function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已�
     else if (p.chg < 5 && p.vr > 1.5) buyType = "突破买(B1)";
     else buyType = "回踩买(B2)";
     const buyPrice = buyType === "突破买(B1)" ? Math.round(it.h20 * 1.005 * 100) / 100 : Math.round(it.ma10 * 1.005 * 100) / 100;
-    let stop = Math.min(it.h20 * 0.93, it.ma30 * 0.99);
-    stop = Math.round(stop * 100) / 100;
+    let stop = Math.round(buyPrice * 0.92 * 100) / 100; // 统一止损 -8%（不再按20日高点/30日均线浮动，避免紫竹那种31%宽止损裸奔）
     const prob = Math.round(Math.min(92, Math.max(20, score + Math.min(8, (p.vr - 1) * 2) + Math.min(6, it.redDays * 0.8))) * 10) / 10;
     picks.push({
       code: p.code,
@@ -867,6 +868,10 @@ async function runStable(prog, 已推码集) {
     zbMap = A[3];
   const zbN = Object.keys(zbMap).length;
   const temp = temperature(idxs, zt, dtN, zbN);
+  if (temp.temp < 35) {
+    P(18, "市场温度 " + temp.temp + " 分（" + temp.state + "），弱市停推");
+    return 空仓("市场温度 " + temp.temp + "（" + temp.state + "），大盘弱势降频停推，避免逆势追高");
+  }
   const main = mainLines(zt);
   const mainNames = main.map((x) => x.name);
   P(18, "温度 " + temp.temp + " 分 · 涨停 " + temp.zt_count + " 家 · 主线 " + mainNames.length + " 个");
