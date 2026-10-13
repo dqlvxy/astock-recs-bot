@@ -489,7 +489,7 @@ function scan(cands, ztCodes) {
     if (vr == null || vr < CFG.量比下限 || vr > CFG.量比上限) continue; // 量比区间（情绪票剔除，区间由复盘自适应）
     if (turn == null || turn < CFG.换手下限 || turn > CFG.换手上限) continue; // 换手区间（情绪票剔除，区间由复盘自适应）
     if (fmv < 20 || fmv > 800) continue; // 流通市值 20-800亿
-    if (price > 50) continue; // 股价 <= 50
+    if (price > 60) continue; // 股价 <= 60（用户放宽）
     if (name.indexOf("ST") >= 0 || name.indexOf("*") >= 0 || name.indexOf("N") === 0 || name.indexOf("退") >= 0) continue;
     if (zs[code]) continue; // 涨停封死买不进
     if (chg >= 9.5) continue; // 未涨停（主板）
