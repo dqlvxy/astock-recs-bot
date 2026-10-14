@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "updated": "2026-10-13 06:53:59",
-  "count": 3,
+  "updated": "2026-10-14 07:11:51",
+  "count": 4,
   "recs": [
     {
       "date": "20261008",
@@ -318,6 +318,112 @@
           "pct_chg": 2.62,
           "turnover": 6.31,
           "vol_ratio": 1.74
+        }
+      ]
+    },
+    {
+      "date": "20261014",
+      "gen_time": "2026-10-14 07:11:51",
+      "picks": [
+        {
+          "code": "600285",
+          "name": "羚锐制药",
+          "prob": 48.5,
+          "score": 40.6,
+          "buy_price": 21.23,
+          "stop_loss": 19.53,
+          "industry": "",
+          "buy_type": "突破买(B1)",
+          "reasons": {
+            "tech": "MA多头·MACD红柱加长·红25天·量比2·换手3.4%",
+            "fund": "ROE 14% · 净利同比 4.4%",
+            "msg": "快讯提及 0 次 · 无个股新闻"
+          },
+          "is_main": false,
+          "pct": 3.89,
+          "pct_chg": 3.89,
+          "turnover": 3.42,
+          "vol_ratio": 1.95
+        },
+        {
+          "code": "002292",
+          "name": "奥飞娱乐",
+          "prob": 41.1,
+          "score": 37.4,
+          "buy_price": 9.48,
+          "stop_loss": 8.72,
+          "industry": "",
+          "buy_type": "突破买(B1)",
+          "reasons": {
+            "tech": "MA多头·MACD红柱加长·红2天·量比2.1·换手14.5%",
+            "fund": "ROE 5.8% · 净利同比 370.7%",
+            "msg": "快讯提及 0 次 · 无个股新闻"
+          },
+          "is_main": false,
+          "pct": 2.95,
+          "pct_chg": 2.95,
+          "turnover": 14.52,
+          "vol_ratio": 2.05
+        },
+        {
+          "code": "600993",
+          "name": "马应龙",
+          "prob": 42.4,
+          "score": 35.2,
+          "buy_price": 24.68,
+          "stop_loss": 22.71,
+          "industry": "",
+          "buy_type": "突破买(B1)",
+          "reasons": {
+            "tech": "MA多头·MACD红柱加长·红6天·量比2.2·换手2.7%",
+            "fund": "ROE 8% · 净利同比 5.6%",
+            "msg": "快讯提及 0 次 · 无个股新闻"
+          },
+          "is_main": false,
+          "pct": 3.54,
+          "pct_chg": 3.54,
+          "turnover": 2.69,
+          "vol_ratio": 2.22
+        },
+        {
+          "code": "002027",
+          "name": "分众传媒",
+          "prob": 38.3,
+          "score": 32.6,
+          "buy_price": 4.88,
+          "stop_loss": 4.49,
+          "industry": "",
+          "buy_type": "回踩买(B2)",
+          "reasons": {
+            "tech": "MA多头·MACD红柱加长·红6天·量比1.4·换手2.6%",
+            "fund": "ROE 20.4% · 净利同比 17.4%",
+            "msg": "快讯提及 0 次 · 无个股新闻"
+          },
+          "is_main": false,
+          "pct": 2.94,
+          "pct_chg": 2.94,
+          "turnover": 2.61,
+          "vol_ratio": 1.43
+        },
+        {
+          "code": "603669",
+          "name": "灵康药业",
+          "prob": 38,
+          "score": 32,
+          "buy_price": 6.54,
+          "stop_loss": 6.02,
+          "industry": "",
+          "buy_type": "回踩买(B2)",
+          "reasons": {
+            "tech": "MA多头·MACD红柱加长·红15天·量比1·换手7.5%",
+            "fund": "ROE 3.4% · 净利同比 159.1%",
+            "msg": "快讯提及 0 次 · 无个股新闻"
+          },
+          "is_main": false,
+          "pct": 1.24,
+          "pct_chg": 1.24,
+          "turnover": 7.48,
+          "vol_ratio": 1.02
         }
       ]
     }
