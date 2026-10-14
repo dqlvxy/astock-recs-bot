@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "updated": "2026-10-13 15:48:47",
-  "count": 2,
+  "updated": "2026-10-14 08:00:20",
+  "count": 3,
   "items": [
     {
       "date": "20261008",
@@ -130,6 +130,70 @@
       "verifiable": true,
       "market_chg": 1.2079378774805916,
       "success": 2
+    },
+    {
+      "date": "20261013",
+      "gen_time": "2026-10-13 06:53:59",
+      "picks": [
+        {
+          "code": "601900",
+          "name": "南方传媒",
+          "score": 48.4,
+          "prob": 52.2,
+          "chg": 0.68,
+          "vr": 1.7,
+          "turn": 2.82,
+          "near_limit_up": null,
+          "ret": 1.8
+        },
+        {
+          "code": "603209",
+          "name": "兴通股份",
+          "score": 48.4,
+          "prob": 52.4,
+          "chg": 2.08,
+          "vr": 1.8,
+          "turn": 2.9,
+          "near_limit_up": null,
+          "ret": 0.46
+        },
+        {
+          "code": "301015",
+          "name": "百洋医药",
+          "score": 47,
+          "prob": 54.3,
+          "chg": 1.77,
+          "vr": 1.65,
+          "turn": 2.29,
+          "near_limit_up": null,
+          "ret": -1.21
+        },
+        {
+          "code": "300133",
+          "name": "华策影视",
+          "score": 46.2,
+          "prob": 52.6,
+          "chg": 1.32,
+          "vr": 1.2,
+          "turn": 9.78,
+          "near_limit_up": null,
+          "ret": 2.06
+        },
+        {
+          "code": "002712",
+          "name": "思美传媒",
+          "score": 45.4,
+          "prob": 48.5,
+          "chg": 2.62,
+          "vr": 1.74,
+          "turn": 6.31,
+          "near_limit_up": null,
+          "ret": 0.91
+        }
+      ],
+      "verifiable": true,
+      "market_chg": -1.3640238704177334,
+      "success": 4
     }
   ]
 }
