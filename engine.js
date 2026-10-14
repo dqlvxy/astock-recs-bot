@@ -231,7 +231,7 @@ function temperature(idxs, zt, dtN, zbN) {
 
 /* ── 全市场扫描（腾讯 qt.gtimg，gbk）── */
 const 代码段 =
-  "sh600000-600999|sh601000-601999|sh603000-603999|sh605000-605999|sh688000-688999" +
+  "sh600000-600999|sh601000-601999|sh603000-603999|sh605000-605999" +
   "|sz0-999|sz1000-1999|sz2000-2999|sz3000-3999|sz300000-301999";
 let 全市场代码 = null;
 function 展开代码段() {
@@ -490,6 +490,7 @@ function scan(cands, ztCodes) {
     if (turn == null || turn < CFG.换手下限 || turn > CFG.换手上限) continue; // 换手区间（情绪票剔除，区间由复盘自适应）
     if (fmv < 20 || fmv > 800) continue; // 流通市值 20-800亿
     if (price > 60) continue; // 股价 <= 60（用户放宽）
+    if (code.startsWith("688")) continue; // 排除科创板（用户要求，仅留沪深主板+创业）
     if (name.indexOf("ST") >= 0 || name.indexOf("*") >= 0 || name.indexOf("N") === 0 || name.indexOf("退") >= 0) continue;
     if (zs[code]) continue; // 涨停封死买不进
     if (chg >= 9.5) continue; // 未涨停（主板）
