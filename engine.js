@@ -1,5 +1,5 @@
 // engine.js —— 稳健版选股引擎（Node 移植版）
-// 移植自 A股选股看板.html 的 FS.run（稳健版：消息30%+技术40%+基本面30%）+ 共享数据层 FS工具。
+// 移植自 A股选股看板.html 的 FS.run（稳健版：技术40%+消息40%+基本面20%）+ 共享数据层 FS工具。
 // 纯计算 + 公开行情接口；去除了所有 window/DOM 依赖；gbk 解码用 iconv-lite。
 // 输出结构对齐前端「拉后端存档 / 合并十日荐股」契约：{ date, gen_time, picks, temperature, main_lines }
 import iconv from "iconv-lite";
@@ -869,7 +869,9 @@ const TL = {
 };
 
 /* ── 主流程 runStable（对齐前端 拉后端存档 / 合并十日荐股 契约）──
-   稳健版：消息面30% + 技术面40% + 基本面30%；尾盘买入，持股 1–4 周。
+   稳健版：技术面40% + 消息面40% + 基本面20%；尾盘买入，持股 1–4 周。
+   动态参数：硬门槛（追高上限/量比区间/换手区间/温度下限/连板阈值/止损率）由 review.js
+   每日收盘复盘后写入 params.json 自适应调整，均带硬上下限钳制；params.json 缺失时用默认值。
    去重：同日去重 + 跨期去重（近 3 期已推票由调用方经 已推码集 传入）。
    输出：{ ok, empty, date, gen_time, temperature, main_lines, picks, mode, note, elapsed } */
 async function runStable(prog, 已推码集) {
@@ -947,7 +949,7 @@ async function runStable(prog, 已推码集) {
     main_lines: main,
     picks,
     mode: "stable",
-    note: "稳健版引擎 · 消息30%+技术40%+基本面30% · 尾盘买入持股1-4周",
+    note: "稳健版引擎 · 技术40%+消息40%+基本面20% · 尾盘买入持股1-4周",
   };
 }
 
