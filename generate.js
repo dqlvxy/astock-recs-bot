@@ -111,6 +111,17 @@ function 精简期(g) {
       is_main: x.is_main, mode: x.mode,
       pct: x.pct, pct_chg: x.pct_chg,          /* 荐股日当日涨跌幅：供看板「今日柱子」在无次日数据时兜底 */
       turnover: x.turnover, vol_ratio: x.vol_ratio,
+      /* 三维评分与逐项明细：看板消息面/技术面/基本面三格与「打分理由」弹层的数据源，
+         曾因本白名单漏传导致前端三项恒显 0/10（2026-10-14 修复） */
+      scores: x.scores || null,
+      scores_detail: x.scores_detail || null,
+      /* 近5日累计涨幅：复盘脚本急涨失败率归因的判据（chg5），漏传则归因永远为空 */
+      pct_chg_5d: x.pct_chg_5d != null ? x.pct_chg_5d : null,
+      /* 行情与可买性快照：有实时行情时以前端行情为准，缺失时用选股时刻冻结值兜底 */
+      price: x.price != null ? x.price : null,
+      float_mv: x.float_mv != null ? x.float_mv : null,
+      buyable: x.buyable !== false,
+      buyable_note: x.buyable_note || "",
     })),
   };
 }
