@@ -10,7 +10,7 @@ import { readFileSync, existsSync } from "node:fs";
    params.json 不存在时用默认值（即原引擎阈值）。 */
 let CFG = 读动态参数();
 function 读动态参数() {
-  const def = { 追高上限: 5, 量比下限: 1, 量比上限: 5, 换手下限: 2, 换手上限: 20, 温度下限: 35, 连板阈值: 2, 止损率: 0.92 };
+  const def = { 追高上限: 5, 量比下限: 1, 量比上限: 5, 换手下限: 2, 换手上限: 20, 温度下限: 35, 连板阈值: 2, 止损率: 0.92, 急涨上限: 30 };
   const 钳 = (v, lo, hi) => (typeof v === "number" && isFinite(v) ? Math.min(hi, Math.max(lo, v)) : null);
   try {
     if (existsSync("params.json")) {
@@ -19,7 +19,7 @@ function 读动态参数() {
       const v = (k, lo, hi) => { const x = 钳(c[k], lo, hi); if (x != null) def[k] = Math.round(x * 100) / 100; };
       v("追高上限", 2, 6); v("量比下限", 0.5, 4); v("量比上限", 3, 8);
       v("换手下限", 0.5, 10); v("换手上限", 10, 35); v("温度下限", 30, 50);
-      v("连板阈值", 1, 5); v("止损率", 0.85, 0.97);
+      v("连板阈值", 1, 5); v("止损率", 0.85, 0.97); v("急涨上限", 15, 60);
     }
   } catch (e) {}
   return def;
@@ -597,6 +597,11 @@ function hardFilter(pool, klineMap) {
       if (昨 > 0 && (closes[i] - 昨) / 昨 >= 涨停线 * 0.98) 近5涨停++;
     }
     if (近5涨停 >= CFG.连板阈值) continue; // 连板/接近连板剔除阈值（复盘自适应）
+    // 急涨（近似90度斜率）过滤：近5个交易日累计涨幅过大视为竖直拉升，避免高位接盘（用户要求，复盘自适应）
+    const 近5涨幅 = closes.length >= 6 && closes[closes.length - 6] > 0
+      ? ((closes[closes.length - 1] - closes[closes.length - 6]) / closes[closes.length - 6]) * 100
+      : 0;
+    if (近5涨幅 >= CFG.急涨上限) continue; // 斜率过陡剔除阈值（复盘自适应）
     if (!(ma5 > ma10 && ma10 > ma30)) continue; // 均线多头
     if (!(ma5 > ma5p && ma10 > ma10p && ma30 > ma30p)) continue; // 同步上行
     const last = closes[closes.length - 1];
@@ -614,7 +619,7 @@ function hardFilter(pool, klineMap) {
       }
     let h20 = 0;
     for (let h = Math.max(0, closes.length - 20); h < closes.length; h++) if (closes[h] > h20) h20 = closes[h];
-    out.push({ p, ma5, ma10, ma30, redDays, h20, 涨停回调, 红柱加长 });
+    out.push({ p, ma5, ma10, ma30, redDays, h20, 涨停回调, 红柱加长, 近5涨幅: Math.round(近5涨幅 * 10) / 10 });
   }
   return out;
 }
@@ -814,6 +819,7 @@ function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已�
       buyable: true,
       buyable_note: "未封板，可买入",
       pct_chg: p.chg,
+      pct_chg_5d: it.近5涨幅 != null ? Math.round(it.近5涨幅 * 100) / 100 : null,
       turnover: Math.round(p.turn * 100) / 100,
       vol_ratio: Math.round(p.vr * 100) / 100,
       reasons: {
@@ -871,8 +877,9 @@ const TL = {
 
 /* ── 主流程 runStable（对齐前端 拉后端存档 / 合并十日荐股 契约）──
    稳健版：技术面40% + 消息面40% + 基本面20%；尾盘买入，持股 1–4 周。
-   动态参数：硬门槛（追高上限/量比区间/换手区间/温度下限/连板阈值/止损率）由 review.js
+   动态参数：硬门槛（追高上限/量比区间/换手区间/温度下限/连板阈值/急涨上限/止损率）由 review.js
    每日收盘复盘后写入 params.json 自适应调整，均带硬上下限钳制；params.json 缺失时用默认值。
+   急涨上限：近5个交易日累计涨幅≥此值视为近似90度竖直拉升，剔除（默认30%，用户要求）。
    去重：同日去重 + 跨期去重（近 3 期已推票由调用方经 已推码集 传入）。
    输出：{ ok, empty, date, gen_time, temperature, main_lines, picks, mode, note, elapsed } */
 async function runStable(prog, 已推码集) {

@@ -94,11 +94,11 @@ function 默认参数() {
   return {
     updated: "",
     note: "由 review.js 根据近 N 期滚动成功率自动生成；engine.js 读取后对硬门槛做温和、有界的收紧。",
-    cfg: { 追高上限: 5, 量比上限: 5, 换手上限: 20, 温度下限: 35, 连板阈值: 2, 止损率: 0.92 },
-    stats: { 期数: 0, 样本票数: 0, 胜数: 0, 成功率: null, 追高失败率: null, 情绪失败率: null, 弱市失败率: null, 平均失败跌幅: null },
+    cfg: { 追高上限: 5, 量比上限: 5, 换手上限: 20, 温度下限: 35, 连板阈值: 2, 止损率: 0.92, 急涨上限: 30 },
+    stats: { 期数: 0, 样本票数: 0, 胜数: 0, 成功率: null, 追高失败率: null, 情绪失败率: null, 弱市失败率: null, 平均失败跌幅: null, 急涨失败率: null },
   };
 }
-const 限 = { 追高上限: [2, 6], 量比上限: [3, 8], 换手上限: [10, 35], 温度下限: [30, 50], 连板阈值: [1, 5], 止损率: [0.85, 0.97] };
+const 限 = { 追高上限: [2, 6], 量比上限: [3, 8], 换手上限: [10, 35], 温度下限: [30, 50], 连板阈值: [1, 5], 止损率: [0.85, 0.97], 急涨上限: [15, 60] };
 const 钳 = (v, k) => {
   const [lo, hi] = 限[k];
   return Math.min(hi, Math.max(lo, v));
@@ -117,6 +117,7 @@ function 算优化参数(items) {
   const 弱市失败率 = 失败.length ? 失败.filter((p) => p.大盘 != null && p.大盘 < 0).length / 失败.length : null;
   const 平均失败跌幅 = 失败.length ? Math.round((失败.reduce((s, p) => s + p.ret, 0) / 失败.length) * 10) / 10 : null;
   const 连板失败率 = 失败.length ? 失败.filter((p) => p.near_limit_up != null && p.near_limit_up >= 2).length / 失败.length : null;
+  const 急涨失败率 = 失败.length ? 失败.filter((p) => p.chg5 != null && p.chg5 >= 30).length / 失败.length : null;
 
   const cfg = 参数.cfg;
   // 滚动成功率低 → 收紧追高 + 提高弱市门槛
@@ -136,9 +137,11 @@ function 算优化参数(items) {
   if (平均失败跌幅 != null && 平均失败跌幅 < -10) cfg.止损率 = 钳(0.94, "止损率");
   // 连板/接近连板失败占比高 → 提高连板剔除阈值（1 最严）
   if (连板失败率 != null && 连板失败率 > 0.5) cfg.连板阈值 = 钳(Math.max(1, cfg.连板阈值 - 1), "连板阈值");
+  // 失败票多因90度急拉（近5日涨幅≥30%）→ 收紧急涨上限
+  if (急涨失败率 != null && 急涨失败率 > 0.5) cfg.急涨上限 = 钳(Math.min(cfg.急涨上限, 20), "急涨上限");
 
   参数.cfg = cfg;
-  参数.stats = { 期数: 有效.length, 样本票数: total, 胜数: win, 成功率, 追高失败率, 情绪失败率, 弱市失败率, 平均失败跌幅, 连板失败率 };
+  参数.stats = { 期数: 有效.length, 样本票数: total, 胜数: win, 成功率, 追高失败率, 情绪失败率, 弱市失败率, 平均失败跌幅, 连板失败率, 急涨失败率 };
   参数.updated = new Date().toLocaleString("sv-SE").replace("T", " ");
   return 参数;
 }
@@ -179,6 +182,7 @@ async function 主流程() {
         vr: p.vol_ratio != null ? p.vol_ratio : null,  // 量比
         turn: p.turnover != null ? p.turnover : null,  // 换手
         near_limit_up: p.near_limit_up != null ? p.near_limit_up : null,
+        chg5: p.pct_chg_5d != null ? p.pct_chg_5d : null,   // 推荐日前近5日累计涨幅（急涨判据）
         ret: ret != null ? Math.round(ret * 100) / 100 : null,
       };
       if (ret != null && ret > 0) 涨++;
@@ -215,6 +219,7 @@ async function 主流程() {
   md += 线(`- 情绪失败率（量比>5/换手>20 后失败）：${st.情绪失败率 == null ? "—" : (Math.round(st.情绪失败率 * 100) + "%")}`);
   md += 线(`- 弱市失败率（大盘下跌日失败占比）：${st.弱市失败率 == null ? "—" : (Math.round(st.弱市失败率 * 100) + "%")}`);
   md += 线(`- 连板/接近连板失败率：${st.连板失败率 == null ? "—" : (Math.round(st.连板失败率 * 100) + "%")}`);
+  md += 线(`- 急涨失败率（近5日涨幅≥30% 后失败）：${st.急涨失败率 == null ? "—" : (Math.round(st.急涨失败率 * 100) + "%")}`);
   md += 线(`- 平均失败跌幅：**${st.平均失败跌幅 == null ? "—" : st.平均失败跌幅 + "%"}**`);
   md += 线("");
   md += 线("## 本轮优化后的引擎参数（engine.js 将读取）");
@@ -224,6 +229,7 @@ async function 主流程() {
   md += 线(`- 换手上限（>此值剔情绪票）：**${cg.换手上限}%**`);
   md += 线(`- 弱市温度下限（<此值空仓停推）：**${cg.温度下限}**`);
   md += 线(`- 接近连板剔除阈值（近5日≥此次数涨停剔除）：**${cg.连板阈值}**`);
+  md += 线(`- 急涨上限（近5日累计涨幅≥此值剔除，90度斜率）：**${cg.急涨上限}%**`);
   md += 线(`- 统一止损率：**${Math.round((1 - cg.止损率) * 100)}%**（buyPrice × ${cg.止损率}）`);
   md += 线("");
   md += 线("## 各期明细");
