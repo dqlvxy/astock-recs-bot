@@ -138,6 +138,25 @@ async function main() {
   if (有KV凭据) 历史 = await 读KV("astock_recs_history");
   if (!历史) 历史 = 读本地存档().recs;
 
+  /* ── 当日定稿冻结（2026-10-15 事故后加的永久规则，别删）──────────────
+     起因：当日 15:12 定时定稿被 17:54 手动补跑用收盘后数据覆盖，同一天出现两个版本
+     （定时版一心堂 / 补跑版金域医学），看板「今日持股」显示了用户并未实购的股票。
+     老板的流程是「14:30 荐股定稿 → 14:50 买入 → 次日涨了卖」，
+     故当日一旦有存档，它就是操作依据，后续任何触发都不得覆盖。
+     需要强制重算时设 FORCE=1（workflow_dispatch 勾选 force）。 */
+  const 强制重算 = /^(1|true)$/i.test(String(process.env.FORCE || "").trim());
+  const 今日已有 = (Array.isArray(历史) ? 历史 : []).find((g) => g && g.date === 今日);
+  if (今日已有 && !强制重算) {
+    console.log(
+      `⏸ 今日 ${今日} 已有定稿（gen_time=${今日已有.gen_time || "?"}，` +
+        `${(今日已有.picks || []).length} 只），跳过重算以保持定稿不变（强制重算请设 FORCE=1）`
+    );
+    return;
+  }
+  if (今日已有 && 强制重算) {
+    console.log(`⚠️ FORCE=1 强制重算：将覆盖今日已有定稿（gen_time=${今日已有.gen_time || "?"}）`);
+  }
+
   const 已推码集 = 组装近3期已推码(历史, 今日, 是周末, 是休市日);
   console.log(`开始生成 ${今日} 稳健版荐股…（近 3 个交易日已推 ${Object.keys(已推码集).length} 只，将排除）`);
 
