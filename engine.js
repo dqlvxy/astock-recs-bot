@@ -218,25 +218,50 @@ function mainLines(zt) {
   out.sort((a, b) => b.net_in - a.net_in);
   return out.slice(0, 5);
 }
-function temperature(idxs, zt, dtN, zbN) {
-  let sh = null;
-  for (const x of idxs) if (x.f12 === "000001") sh = x;
-  const raw = sh ? sh.f3 || 0 : 0;
-  const shChg = Math.abs(raw) > 20 ? raw / 100 : raw;
+function temperature(idxs, zt, dtN, zbN, breadth) {
+  /* 2026-10-16 重构（用户质疑：10-15 三大指数 -1.6~-2.9%、涨 399 跌 4781、跌停 28 家，
+     原算法仍给 44 分「中性偏弱」）。原算法三个缺陷：
+     ① 完全没有涨跌家数维度——普跌日（仅 7.7% 个股上涨）最直观的指标被忽略；
+     ② 涨停数占 30 分、最高连板占 20 分——普跌日涨停是极少数逆势票、连板高度由少数资金抱团，
+        都不能代表市场人气，却合计贡献 40 分；
+     ③ 指数项只取上证且硬顶（shChg<-1 顶 55）在 -1.59% 时未触发，深成指/创业板跌幅完全没计入。
+     新算法满分 100：广度 30 + 涨停 18 + 连板 8 + 跌停 18 + 炸板 12 + 指数 14。 */
+  let shChg = 0, 指和 = 0, 指数 = 0;
+  for (const x of idxs) {
+    const raw = x.f3 || 0;
+    const v = Math.abs(raw) > 20 ? raw / 100 : raw;
+    指和 += v;
+    指数++;
+    if (x.f12 === "000001") shChg = v;
+  }
+  const 指均 = 指数 ? 指和 / 指数 : 0;
   let maxLb = 0;
   for (const x of zt) if (x.lbc > maxLb) maxLb = x.lbc;
   const zbRate = zt.length + zbN > 0 ? (zbN / (zt.length + zbN)) * 100 : 0;
   let s = 0;
-  s += Math.min(30, (zt.length / 45) * 30);
-  s += Math.min(20, (maxLb / 5) * 20);
-  s += Math.max(0, 15 - dtN * 3);
-  s += Math.max(0, 20 - Math.max(0, zbRate - 15) * 0.9);
-  s += Math.max(0, 15 - Math.max(0, -shChg) * 10);
-  if (shChg < -1) s = Math.min(s, 55);
-  if (shChg < -2) s = Math.min(s, 35);
+  /* ① 涨跌家数比 30 分（新增，权重最高）：涨家占比 60% 视为满分；数据缺失给中位 15 分不偏袒 */
+  if (breadth && breadth.total > 0 && breadth.up != null) {
+    const 涨比 = breadth.up / breadth.total;
+    s += Math.max(0, Math.min(30, (涨比 / 0.6) * 30));
+  } else {
+    s += 15;
+  }
+  /* ② 涨停数 18 分（原 30 分下调） */
+  s += Math.min(18, (zt.length / 45) * 18);
+  /* ③ 最高连板 8 分（原 20 分下调：弱市连板不代表人气） */
+  s += Math.min(8, (maxLb / 5) * 8);
+  /* ④ 跌停数 18 分（原 15 分上调：跌停潮是恐慌信号，28 家应清零该项） */
+  s += Math.max(0, 18 - dtN * 1.2);
+  /* ⑤ 炸板率 12 分（原 20 分，惩罚力度保持） */
+  s += Math.max(0, 12 - Math.max(0, zbRate - 15) * 1.2);
+  /* ⑥ 指数 14 分：改用三大指数均值（深成指/创业板同日跌幅同样计入） */
+  s += Math.max(0, 14 - Math.max(0, -指均) * 8);
+  if (指均 < -1) s = Math.min(s, 60);
+  if (指均 < -2) s = Math.min(s, 30);
   s = Math.max(0, Math.min(100, Math.round(s)));
   const state = s >= 70 ? "强势" : s >= 50 ? "中性偏强" : s >= 35 ? "中性偏弱" : "冰点/退潮";
-  return { temp: s, zt_count: zt.length, state: state, shChg: shChg };
+  return { temp: s, zt_count: zt.length, state: state, shChg: shChg, 指均: Math.round(指均 * 100) / 100,
+           广度: breadth && breadth.total ? Math.round((breadth.up / breadth.total) * 1000) / 10 : null };
 }
 
 /* ── 全市场扫描（腾讯 qt.gtimg，gbk）── */
@@ -1030,15 +1055,6 @@ async function runStable(prog, 已推码集) {
     dtN = A[2],
     zbMap = A[3];
   const zbN = Object.keys(zbMap).length;
-  const temp = temperature(idxs, zt, dtN, zbN);
-  if (temp.temp < CFG.温度下限) { // 弱市停推温度下限（复盘自适应）
-    P(18, "市场温度 " + temp.temp + " 分（" + temp.state + "），弱市停推");
-    return 空仓("市场温度 " + temp.temp + "（" + temp.state + "），大盘弱势降频停推，避免逆势追高");
-  }
-  const main = mainLines(zt);
-  const mainNames = main.map((x) => x.name);
-  P(18, "温度 " + temp.temp + " 分 · 涨停 " + temp.zt_count + " 家 · 主线 " + mainNames.length + " 个");
-
   P(24, "扫描全市场（沪深主板）…");
   let all;
   try {
@@ -1046,6 +1062,25 @@ async function runStable(prog, 已推码集) {
   } catch (e) {
     return 空仓("全市场行情拉取失败：" + (e && e.message));
   }
+  /* 涨跌家数（2026-10-16 温度重构）：直接从全市场扫描结果统计，不额外拉一次行情 */
+  let 广度 = null;
+  if (Array.isArray(all) && all.length) {
+    let up = 0, down = 0, flat = 0;
+    for (const r of all) {
+      const c = r.f3 == null ? null : (Math.abs(r.f3) > 20 ? r.f3 / 100 : r.f3);
+      if (c == null) continue;
+      if (c > 0) up++; else if (c < 0) down++; else flat++;
+    }
+    广度 = { up, down, flat, total: up + down + flat };
+  }
+  const temp = temperature(idxs, zt, dtN, zbN, 广度);
+  if (temp.temp < CFG.温度下限) { // 弱市停推温度下限（复盘自适应）
+    P(18, "市场温度 " + temp.temp + " 分（" + temp.state + "，涨 " + (广度 ? 广度.up : "—") + "/跌 " + (广度 ? 广度.down : "—") + "），弱市停推");
+    return 空仓("市场温度 " + temp.temp + "（" + temp.state + "），大盘弱势降频停推，避免逆势追高");
+  }
+  const main = mainLines(zt);
+  const mainNames = main.map((x) => x.name);
+  P(18, "温度 " + temp.temp + " 分 · 涨停 " + temp.zt_count + " 家 · 涨 " + (广度 ? 广度.up : "—") + "/跌 " + (广度 ? 广度.down : "—") + " · 主线 " + mainNames.length + " 个");
   const ztCodes = zt.map((x) => String(x.c));
   const cands = scan(all, ztCodes);
   P(40, "初筛候选 " + cands.length + " 只（红盘/量比/换手/市值/可买）");
