@@ -20,6 +20,7 @@ import {
   取日K,
 } from "./engine.js";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
+import { runYaoQianli } from "./yaogu.js";   /* 妖股潜力扫描（2026-10-15 上云） */
 
 const UA = "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36";
 const 输出文件 = process.env.TODAY_FILE || "today.json";
@@ -529,6 +530,18 @@ async function main() {
   let sector_fund = null;
   try { sector_fund = await 建资金流快照(); } catch (e) { console.log("  资金流快照失败：", e.message); }
 
+  /* ── ⑦ 妖股潜力扫描（云端；2026-10-15 由前端 FS3 移植上云）──────────
+     前端只显示、不做运算；扫描失败不影响其余模块（try/catch 兜底）。 */
+  let 妖股潜力 = null;
+  try {
+    console.log("  [7/7] 妖股潜力扫描（云端）…");
+    妖股潜力 = await runYaoQianli(function (p, m) { if (m) console.log(`      [${p}%] ${m}`); });
+    console.log(`      妖股扫描完成：${妖股潜力 && 妖股潜力.empty ? "空仓（" + 妖股潜力.空仓原因 + "）" : (妖股潜力.picks || []).length + " 只"}`);
+  } catch (e) {
+    console.warn("      妖股潜力扫描失败（不影响其余模块）：", (e && e.message) || e);
+    妖股潜力 = { empty: true, 空仓原因: "云端扫描未完成：" + ((e && e.message) || e), date: String(数据日 || ""), picks: [], mode: "yao_ql" };
+  }
+
   const 包 = {
     ok: true,
     gen_time: new Date().toLocaleString("sv-SE").replace("T", " "),
@@ -542,6 +555,7 @@ async function main() {
     yaogu,
     hit_total,
     temperature: 温,
+    yaogu_potential: 妖股潜力,   /* 妖股雷达：结果全部由云端产出，前端只显示 */
     main_lines: 主线,
     watch: watch,
     sector_fund: sector_fund,
