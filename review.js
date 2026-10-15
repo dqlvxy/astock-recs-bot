@@ -51,23 +51,35 @@ async function 拉K线(code, lmt = 15) {
   return 拉K线Sec(secid(code), lmt);
 }
 
-// 拉K线（secid 直传）：专供指数使用。secid() 只懂个股板块前缀，
-// 上证指数 000001 会被判成深市平安银行(0.000001)——「大盘涨跌」语义全错，故指数必须直传 1.000001
-// fields2 = f51日期,f52开,f53收,f54高,f55低,f56量,f57额：持股日解剖要跳空/最低/量能，只收 close 不够
-async function 拉K线Sec(sec, lmt = 15) {
+async function 拉K线字段(sec, lmt, f1, f2, 段数) {
   const url =
     `https://push2his.eastmoney.com/api/qt/stock/kline/get?` +
-    `secid=${sec}&fields1=f1,f2,f3&fields2=f51,f52,f53,f54,f55,f56,f57&klt=101&fqt=1&beg=0&end=20500101&lmt=${lmt}`;
+    `secid=${sec}&fields1=${f1}&fields2=${f2}&klt=101&fqt=1&beg=0&end=20500101&lmt=${lmt}`;
   try {
     const d = await j(url);
     if (!d || !d.data || !d.data.klines) return null;
     return d.data.klines.map((k) => {
-      const [date, open, close, high, low, vol] = k.split(",");
-      return { date, open: parseFloat(open), close: parseFloat(close), high: parseFloat(high), low: parseFloat(low), vol: parseFloat(vol) };
+      const 段 = k.split(",");
+      const r = { date: 段[0], close: parseFloat(段[段数 - 1]) };
+      if (段数 >= 6) {
+        r.open = parseFloat(段[1]); r.high = parseFloat(段[3]); r.low = parseFloat(段[4]); r.vol = parseFloat(段[5]);
+      }
+      return r;
     });
   } catch (e) {
     return null;
   }
+}
+
+// 拉K线（secid 直传）：专供指数使用。secid() 只懂个股板块前缀，
+// 上证指数 000001 会被判成深市平安银行(0.000001)——「大盘涨跌」语义全错，故指数必须直传 1.000001
+// fields2 = f51日期,f52开,f53收,f54高,f55低,f56量,f57额：持股日解剖要跳空/最低/量能，只收 close 不够
+// 双保险：扩展字段失败（东财对参数组合敏感，2026-10-15 实测曾整批报错）→ 回退最小字段集
+//（date+close），保证次日涨跌/近5涨停/近5涨幅不空转；持股日解剖字段缺失时归因少几项但不炸
+async function 拉K线Sec(sec, lmt = 15) {
+  const k = await 拉K线字段(sec, lmt, "f1,f2,f3,f4,f5,f6", "f51,f52,f53,f54,f55,f56,f57", 7);
+  if (k && k.length) return k;
+  return 拉K线字段(sec, lmt, "f1,f2,f3", "f51,f53", 2);
 }
 
 // 在K线里定位推荐日 index，取 index+1（下一交易日）收盘，算次日涨跌%
@@ -333,8 +345,17 @@ async function 主流程() {
   const 参数 = 算优化参数(全部项.filter((x) => x.verifiable));
 
   const 复盘包 = { ok: true, updated: new Date().toLocaleString("sv-SE").replace("T", " "), count: 全部项.length, items: 全部项 };
-  writeFileSync(复盘文件, JSON.stringify(复盘包, null, 2), "utf-8");
-  writeFileSync(参数文件, JSON.stringify(参数, null, 2), "utf-8");
+  /* 防空定稿覆盖（2026-10-15 事故：fields 参数整批报错 → 全部期「次日尚未发生」→ 0 期可验证
+     → 历史定稿被空 items 清空、params 重置默认）。
+     本次 0 期可验证且历史有可验证期 = 通道故障特征，保留历史文件不写，等下次重跑 */
+  const 历史可验证 = (历史项 || []).filter((x) => x && x.verifiable).length;
+  const 本次可验证 = 全部项.filter((x) => x.verifiable).length;
+  if (!本次可验证 && 历史可验证 > 0) {
+    console.log(`⚠️ 本次 ${本次可验证} 期可验证、历史 ${历史可验证} 期——疑似K线通道故障，保留历史定稿不覆盖`);
+  } else {
+    writeFileSync(复盘文件, JSON.stringify(复盘包, null, 2), "utf-8");
+    writeFileSync(参数文件, JSON.stringify(参数, null, 2), "utf-8");
+  }
 
   // 人类可读复盘报告 review.md
   const 线 = (s) => s + "\n";
