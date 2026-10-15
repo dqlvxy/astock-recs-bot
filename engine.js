@@ -986,6 +986,8 @@ export {
   getDTPool,
   取日K,
   batchKlines,
+  batchNews,
+  analyzeSentiment,
   批行业,
   上一交易日,
   取行情文本,
