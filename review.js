@@ -95,6 +95,41 @@ async function 大盘涨跌(date) {
   return null;
 }
 
+// 近5交易日涨停/接近涨停次数（复刻 engine.js hardFilter 口径：3x/688 涨停线 19.8%、其余 9.8%，
+// 单日涨幅 ≥ 涨停线×0.98 计一次；窗口 = 推荐日往前 5 个交易日，逐日 vs 前收）。
+// 背景：engine 产出端从未落过 near_limit_up 字段，归档/复盘两侧该判据一直空转（连板失败率恒 0）。
+// 复盘侧已拉到每票日K，按同一口径重算——历史期与未来期一并补齐，不依赖归档补字段。
+function 近5涨停数(kline, recDate, code) {
+  if (!kline || !kline.length) return null;
+  const c = String(code || "");
+  const 涨停线 = c.charAt(0) === "3" || c.startsWith("688") ? 0.198 : 0.098;
+  let i0 = -1;
+  for (let i = 0; i < kline.length; i++) {
+    if (kline[i].date.replace(/-/g, "") === String(recDate)) { i0 = i; break; }
+  }
+  if (i0 < 1) return null;
+  let n = 0;
+  for (let i = Math.max(1, i0 - 4); i <= i0; i++) {
+    const 昨 = kline[i - 1].close, 今 = kline[i].close;
+    if (昨 > 0 && 今 > 0 && (今 - 昨) / 昨 >= 涨停线 * 0.98) n++;
+  }
+  return n;
+}
+
+// 推荐日前近5日累计涨幅（复刻 engine.js 急涨口径：推荐日收盘 vs 其前第 5 个交易日收盘）。
+// 归档白名单 10-14 才补传 pct_chg_5d，此前历史期该字段为 null，急涨归因空转——同样按日K重算兜底。
+function 近5涨幅(kline, recDate) {
+  if (!kline || !kline.length) return null;
+  let i0 = -1;
+  for (let i = 0; i < kline.length; i++) {
+    if (kline[i].date.replace(/-/g, "") === String(recDate)) { i0 = i; break; }
+  }
+  if (i0 < 6) return null;
+  const 起 = kline[i0 - 5].close, 终 = kline[i0].close;
+  if (!(起 > 0) || !(终 > 0)) return null;
+  return Math.round(((终 - 起) / 起) * 10000) / 100;
+}
+
 // 默认参数 + 硬上下限保护
 function 默认参数() {
   return {
@@ -187,8 +222,8 @@ async function 主流程() {
         chg: p.pct_chg != null ? p.pct_chg : null,   // 推荐日涨幅（追高判据）
         vr: p.vol_ratio != null ? p.vol_ratio : null,  // 量比
         turn: p.turnover != null ? p.turnover : null,  // 换手
-        near_limit_up: p.near_limit_up != null ? p.near_limit_up : null,
-        chg5: p.pct_chg_5d != null ? p.pct_chg_5d : null,   // 推荐日前近5日累计涨幅（急涨判据）
+        near_limit_up: p.near_limit_up != null ? p.near_limit_up : 近5涨停数(kl, g.date, p.code),
+        chg5: p.pct_chg_5d != null ? p.pct_chg_5d : 近5涨幅(kl, g.date),   // 推荐日前近5日累计涨幅（急涨判据）
         ret: ret != null ? Math.round(ret * 100) / 100 : null,
       };
       if (ret != null && ret > 0) 涨++;
