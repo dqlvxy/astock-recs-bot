@@ -46,9 +46,15 @@ function secid(code) {
 
 // 拉近 N 日 日K（前复权）：返回 [{date:"2026-10-08", close:12.34}]
 async function 拉K线(code, lmt = 15) {
+  return 拉K线Sec(secid(code), lmt);
+}
+
+// 拉K线（secid 直传）：专供指数使用。secid() 只懂个股板块前缀，
+// 上证指数 000001 会被判成深市平安银行(0.000001)——「大盘涨跌」语义全错，故指数必须直传 1.000001
+async function 拉K线Sec(sec, lmt = 15) {
   const url =
     `https://push2his.eastmoney.com/api/qt/stock/kline/get?` +
-    `secid=${secid(code)}&fields1=f1,f2,f3&fields2=f51,f53&klt=101&fqt=1&beg=0&end=20500101&lmt=${lmt}`;
+    `secid=${sec}&fields1=f1,f2,f3&fields2=f51,f53&klt=101&fqt=1&beg=0&end=20500101&lmt=${lmt}`;
   try {
     const d = await j(url);
     if (!d || !d.data || !d.data.klines) return null;
@@ -74,9 +80,9 @@ function 次日涨跌(kline, recDate) {
   return null;
 }
 
-// 大盘当日涨跌（上证日K）
+// 大盘当日涨跌（上证指数日K，secid=1.000001 直传）
 async function 大盘涨跌(date) {
-  const kline = await 拉K线("000001", 15);
+  const kline = await 拉K线Sec("1.000001", 15);
   if (!kline) return null;
   for (let i = 0; i < kline.length; i++) {
     if (kline[i].date.replace(/-/g, "") === String(date)) {
