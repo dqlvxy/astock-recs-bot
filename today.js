@@ -461,7 +461,15 @@ async function main() {
   let watch = { ok: true, items: [] };
   try { watch = await 建自选(全市场映射); } catch (e) { console.log("  自选生成失败：", e.message); }
 
-  const 包 = {
+  /* 仓位建议（2026-10-16）：与看板阈值一致（70/50/35），由温度决定 */
+  const pos_advice = 温 && 温.temp != null
+    ? (温.temp >= 70 ? "总仓位 60-80%，可适度追强"
+      : 温.temp >= 50 ? "总仓位 40-60%，低吸为主不追高"
+      : 温.temp >= 35 ? "总仓位 20-40%，只做确定性最高 1-2 只"
+      : "空仓或 ≤10% 试错，等主线明确再加仓")
+    : "";
+
+  let 包 = {
     ok: true,
     gen_time: new Date().toLocaleString("sv-SE").replace("T", " "),
     trade_date: 数据日,
@@ -474,9 +482,32 @@ async function main() {
     yaogu,
     hit_total,
     temperature: 温,
+    pos_advice,
+    zt_count: (zt || []).length,
+    dt_count: dtN,
+    zb_count: zbN,
     main_lines: 主线,
     watch: watch,
   };
+
+  /* 同交易日合并（2026-10-16 修复）：非交易时段（凌晨/盘前）重跑时，
+     东财跌停池/龙虎榜等盘后接口返回空（实测跌停池 0 条 → 看板「跌停 --」），
+     若已有同一 trade_date 的 today.json，则缺失字段沿用旧值，避免重跑导致数据退化。
+     温度/涨跌家数/指数等实时字段始终用新值覆盖。 */
+  try {
+    if (existsSync(输出文件)) {
+      const 旧包 = JSON.parse(readFileSync(输出文件, "utf-8"));
+      if (旧包 && 旧包.trade_date === 数据日) {
+        const 补齐 = [];
+        if ((!包.dt || !包.dt.length) && 旧包.dt && 旧包.dt.length) { 包.dt = 旧包.dt; 补齐.push("dt"); }
+        if ((!包.lhb || !包.lhb.length) && 旧包.lhb && 旧包.lhb.length) { 包.lhb = 旧包.lhb; 补齐.push("lhb"); }
+        if ((!包.yaogu || !包.yaogu.length) && 旧包.yaogu && 旧包.yaogu.length) { 包.yaogu = 旧包.yaogu; 补齐.push("yaogu"); }
+        if ((!包.ladder || !包.ladder.length) && 旧包.ladder && 旧包.ladder.length) { 包.ladder = 旧包.ladder; 补齐.push("ladder"); }
+        if ((!包.main_lines || !包.main_lines.length) && 旧包.main_lines && 旧包.main_lines.length) { 包.main_lines = 旧包.main_lines; 补齐.push("main_lines"); }
+        if (补齐.length) console.log(`  ↺ 同交易日快照补齐（盘后接口返回空）：${补齐.join("/")}`);
+      }
+    }
+  } catch (e) {}
 
   writeFileSync(输出文件, JSON.stringify(包, null, 2), "utf-8");
   /* 自选单独出文件，便于前端按需拉取/上报 */
