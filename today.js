@@ -8,8 +8,7 @@
 //     gen_time, trade_date, auction_time,
 //     index:{sh,sz,cyb}, market_stat:{up,down,flat,total},
 //     zt_total, ladder:{1,2,3,4p}, lhb:[...], yaogu:[...],
-//     hit_total, temperature:{...}, main_lines:[...], watch:{...},
-//     sector_fund:{口径,源,rows:[{name,code,net}],time}   /* 资金流二级兜底快照 */
+//     hit_total, temperature:{...}, main_lines:[...]
 //   }
 //
 // 覆盖模块：妖股雷达 / 连板梯队 / 昨日复盘 / 竞价扫描 / 市场温度 / 大盘指数
@@ -20,7 +19,6 @@ import {
   取日K,
 } from "./engine.js";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
-import { runYaoQianli } from "./yaogu.js";   /* 妖股潜力扫描（2026-10-15 上云） */
 
 const UA = "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36";
 const 输出文件 = process.env.TODAY_FILE || "today.json";
@@ -404,45 +402,6 @@ function 数据归属日(){
   return 上一交易日();
 }
 
-/* ── 资金流快照：个股主力净额 Top（新浪 JSONP 正/负双取） ──
-   背景：前端资金流模块走 CF 边缘代理，个别运营商 PoP 取上游仍可能失败；
-   本快照作为二级兜底 —— 数据来自 Actions 侧（境外网络，实测稳定），
-   与代理同为新浪口径，切换时用户无感知。ETF/基金/转债一律过滤。 */
-async function 建资金流快照() {
-  const 新浪JSONP =
-    "https://vip.stock.finance.sina.com.cn/quotes_service/api/jsonp_v2.php/__cb/MoneyFlow.ssl_bkzj_ssggzj?num=80&sort=netamount&asc=";
-  const 取 = async (asc) => {
-    try {
-      const r = await fetch(新浪JSONP + asc, {
-        headers: { "User-Agent": UA, "Referer": "https://vip.stock.finance.sina.com.cn/moneyflow/" },
-      });
-      const t = await r.text();
-      const m = t.match(/^[^(]*\(([\s\S]*?)\)\s*;?\s*$/);
-      if (!m) return [];
-      return JSON.parse(m[1]);
-    } catch (e) { return []; }
-  };
-  const 转 = (arr) =>
-    (arr || [])
-      .filter(
-        (x) =>
-          x &&
-          x.symbol &&
-          /^(sh6\d{5}|sz[03]\d{5}|bj[489]\d{5})$/.test(x.symbol) &&
-          !/ETF|LOF|基金|转债|国债|指数|债券/.test(x.name)
-      )
-      .map((x) => ({ name: x.name, code: x.symbol.replace(/^(sh|sz|bj)/, ""), net: parseFloat(x.netamount) || 0 }))
-      .filter((x) => x.net !== 0);
-  const rows = 转(await 取("0")).concat(转(await 取("1")));
-  if (!rows.length) return null;
-  return {
-    口径: "个股",
-    源: "新浪财经(Actions快照)",
-    rows,
-    time: new Date().toLocaleString("sv-SE").replace("T", " "),
-  };
-}
-
 async function main() {
   const 今日 = 今日键();
   const 是交易日 = !(是周末() || 是休市日(今日));
@@ -488,34 +447,11 @@ async function main() {
   console.log("  [6/7] 龙虎榜 / 温度 / 主线…");
   const 交易键 = 无横(数据日);
   const lhb = await 建龙虎榜(交易键);
-  const 温0 = temperature(index ? Object.entries(index).map(([k, v]) => ({
+  /* 2026-10-16：温度重构，传入涨跌家数（market_stat 已算好：up/down/flat/total） */
+  const 温 = temperature(index ? Object.entries(index).map(([k, v]) => ({
     f12: k === "sh" ? "000001" : k === "sz" ? "399001" : "399006",
     f3: v.chg_pct, f2: v.price, f14: v.name,
-  })) : [], zt, dtN, zbN);
-  /* 温度字段补齐（2026-10-15）：engine.temperature() 只返回 {temp,zt_count,state,shChg}，
-     而看板温度卡还需要 dt_count / zb_count / max_lb / pos_advice。
-     按「本地只做显示、数据全部云端出」原则，在此用同源数据（涨停池/跌停池/炸板数/连板梯队）补齐，
-     全部来自本轮已取到的变量，不做二次网络请求。 */
-  const 最高连板 = (() => {
-    let m = 0;
-    for (const k in ladder) {
-      if (!(ladder[k] || []).length) continue;
-      const n = k === "4p" ? 4 : Number(k) || 0;
-      if (n > m) m = n;
-    }
-    return m;
-  })();
-  const 温 = Object.assign({}, 温0, {
-    zt_count: 温0.zt_count != null ? 温0.zt_count : (zt ? zt.length : 0),
-    dt_count: 温0.dt_count != null ? 温0.dt_count : (dtN ? dtN.length : 0),
-    zb_count: 温0.zb_count != null ? 温0.zb_count : zbN,
-    max_lb: 温0.max_lb != null ? 温0.max_lb : 最高连板,
-    pos_advice: 温0.pos_advice ||
-      (温0.temp >= 70 ? "总仓位 60-80%，可适度追强"
-        : 温0.temp >= 50 ? "总仓位 40-60%，低吸为主不追高"
-        : 温0.temp >= 35 ? "总仓位 20-40%，只做确定性最高 1-2 只"
-        : "空仓或 ≤10% 试错"),
-  });
+  })) : [], zt, dtN, zbN, market_stat || null);
   const 主线 = mainLines(zt);
 
   /* ⑦ 自选关注行情 */
@@ -524,23 +460,6 @@ async function main() {
   for (const x of 全) 全市场映射[String(x.f12 || x.code || "")] = x;
   let watch = { ok: true, items: [] };
   try { watch = await 建自选(全市场映射); } catch (e) { console.log("  自选生成失败：", e.message); }
-
-  /* ⑧ 资金流快照（二级兜底：边缘代理挂掉时前端用） */
-  console.log("  [8/8] 资金流快照…");
-  let sector_fund = null;
-  try { sector_fund = await 建资金流快照(); } catch (e) { console.log("  资金流快照失败：", e.message); }
-
-  /* ── ⑦ 妖股潜力扫描（云端；2026-10-15 由前端 FS3 移植上云）──────────
-     前端只显示、不做运算；扫描失败不影响其余模块（try/catch 兜底）。 */
-  let 妖股潜力 = null;
-  try {
-    console.log("  [7/7] 妖股潜力扫描（云端）…");
-    妖股潜力 = await runYaoQianli(function (p, m) { if (m) console.log(`      [${p}%] ${m}`); });
-    console.log(`      妖股扫描完成：${妖股潜力 && 妖股潜力.empty ? "空仓（" + 妖股潜力.空仓原因 + "）" : (妖股潜力.picks || []).length + " 只"}`);
-  } catch (e) {
-    console.warn("      妖股潜力扫描失败（不影响其余模块）：", (e && e.message) || e);
-    妖股潜力 = { empty: true, 空仓原因: "云端扫描未完成：" + ((e && e.message) || e), date: String(数据日 || ""), picks: [], mode: "yao_ql" };
-  }
 
   const 包 = {
     ok: true,
@@ -555,10 +474,8 @@ async function main() {
     yaogu,
     hit_total,
     temperature: 温,
-    yaogu_potential: 妖股潜力,   /* 妖股雷达：结果全部由云端产出，前端只显示 */
     main_lines: 主线,
     watch: watch,
-    sector_fund: sector_fund,
   };
 
   writeFileSync(输出文件, JSON.stringify(包, null, 2), "utf-8");
@@ -566,7 +483,7 @@ async function main() {
   try { writeFileSync("watch.json", JSON.stringify(watch, null, 2), "utf-8"); } catch (e) {}
   console.log(
     `✅ 已写入 ${输出文件}：指数 ${Object.keys(index).length} 个 · 涨停 ${包.zt_total} · ` +
-      `梯队 ${Object.values(ladder).reduce((s, v) => s + v.length, 0)} · 妖股 ${yaogu.length}(命中 ${hit_total}) · 龙虎榜 ${lhb.length} · 自选 ${watch.items.length} · 资金流快照 ${sector_fund ? sector_fund.rows.length + " 行" : "无"}`
+      `梯队 ${Object.values(ladder).reduce((s, v) => s + v.length, 0)} · 妖股 ${yaogu.length}(命中 ${hit_total}) · 龙虎榜 ${lhb.length} · 自选 ${watch.items.length}`
   );
 }
 
