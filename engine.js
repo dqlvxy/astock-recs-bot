@@ -9,8 +9,12 @@ import { readFileSync, existsSync } from "node:fs";
    滚动成功率低 → 引擎自动温和收紧硬门槛；全部带硬上下限，防止过度激进。
    params.json 不存在时用默认值（即原引擎阈值）。 */
 let CFG = 读动态参数();
+/* 过滤统计（2026-10-16）：dryrun.js 演练用，记录 hardFilter 各阶段剔除数——主流程只累加，不影响选股 */
+export const 过滤统计 = { 本次: null };
 function 读动态参数() {
-  const def = { 追高上限: 5, 量比下限: 1, 量比上限: 5, 换手下限: 2, 换手上限: 20, 温度下限: 35, 连板阈值: 2, 止损率: 0.92, 急涨上限: 30 };
+  const def = { 追高上限: 5, 量比下限: 1, 量比上限: 5, 换手下限: 2, 换手上限: 20, 温度下限: 35, 连板阈值: 2, 止损率: 0.92, 急涨上限: 30,
+    /* 技术形态策略参数（2026-10-16 新增：金叉选股 / 死叉排除 / 底顶背离） */
+    金叉窗口: 5, 死叉窗口: 3, 背离窗口: 30, 金叉加分: 2, 均线金叉加分: 1, 底背离加分: 4 };
   const 钳 = (v, lo, hi) => (typeof v === "number" && isFinite(v) ? Math.min(hi, Math.max(lo, v)) : null);
   try {
     if (existsSync("params.json")) {
@@ -20,6 +24,8 @@ function 读动态参数() {
       v("追高上限", 2, 6); v("量比下限", 0.5, 4); v("量比上限", 3, 8);
       v("换手下限", 0.5, 10); v("换手上限", 10, 35); v("温度下限", 30, 50);
       v("连板阈值", 1, 5); v("止损率", 0.85, 0.97); v("急涨上限", 15, 60);
+      v("金叉窗口", 2, 15); v("死叉窗口", 1, 10); v("背离窗口", 15, 60);
+      v("金叉加分", 0, 6); v("均线金叉加分", 0, 5); v("底背离加分", 0, 8);
     }
   } catch (e) {}
   return def;
@@ -532,7 +538,82 @@ function macdSeries(closes) {
     deaArr.push(dea);
     histArr.push(2 * (dif - dea));
   }
-  return { dif: difArr[n - 1], dea: deaArr[n - 1], hist: histArr[n - 1], histArr, histPrev: n >= 2 ? histArr[n - 2] : null };
+  return { dif: difArr[n - 1], dea: deaArr[n - 1], hist: histArr[n - 1], histArr, histPrev: n >= 2 ? histArr[n - 2] : null, difArr, deaArr };
+}
+
+/* ── 金叉/死叉/背离（2026-10-16 新增，用户要求：金叉选股、死叉排除、底/顶背离策略）──
+   数据：日K 80 根（取日K 已拉），MACD 用 12/26/9 标准参数，与 macdSeries 同源。
+   策略定位：金叉 / 底背离 = 加分优选（买入信号）；死叉 / 顶背离 = 硬剔除（风险信号）。
+   金叉不作为唯一必要条件——否则与「红柱加长」叠加会使候选池枯竭（实测候选数 20-60 只，全要金叉会显著减少）。 */
+
+/* MACD 金叉：近 窗 日内发生 DIF 上穿 DEA；返回距今天数（1 = 当日金叉），0 表示未发生 */
+function macd金叉序(mc, 窗) {
+  if (!mc || !mc.difArr || !mc.deaArr) return 0;
+  const d = mc.difArr, e = mc.deaArr, n = d.length;
+  for (let k = 0; k < 窗; k++) {
+    const i = n - 1 - k;
+    if (i < 1) break;
+    if (d[i] > e[i] && d[i - 1] <= e[i - 1]) return k + 1;
+  }
+  return 0;
+}
+/* MACD 死叉：近 窗 日内发生 DIF 下穿 DEA（走弱初期，剔除） */
+function macd死叉序(mc, 窗) {
+  if (!mc || !mc.difArr || !mc.deaArr) return 0;
+  const d = mc.difArr, e = mc.deaArr, n = d.length;
+  for (let k = 0; k < 窗; k++) {
+    const i = n - 1 - k;
+    if (i < 1) break;
+    if (d[i] < e[i] && d[i - 1] >= e[i - 1]) return k + 1;
+  }
+  return 0;
+}
+/* 均线某位置值（含第 i 根的 n 日均值）；样本不足返回 null */
+function maAt(closes, n, i) {
+  if (i < n - 1) return null;
+  let s = 0;
+  for (let j = i - n + 1; j <= i; j++) s += closes[j];
+  return s / n;
+}
+/* 均线金叉/死叉：近 窗 日内 MA5 上穿（或下穿）MA10；返回距今天数，0 = 未发生 */
+function 均线交叉序(closes, 窗, 向上) {
+  const n = closes.length;
+  for (let k = 0; k < 窗; k++) {
+    const i = n - 1 - k;
+    if (i < 10) break;
+    const a0 = maAt(closes, 5, i), b0 = maAt(closes, 10, i);
+    const a1 = maAt(closes, 5, i - 1), b1 = maAt(closes, 10, i - 1);
+    if (a0 == null || b0 == null || a1 == null || b1 == null) break;
+    if (向上 ? (a0 > b0 && a1 <= b1) : (a0 < b0 && a1 >= b1)) return k + 1;
+  }
+  return 0;
+}
+/* 背离判定（价 vs MACD DIF）：窗口内前后半段极值比较，间隔需 ≥5 日（过滤噪声）
+   底背离 = 后半段最低收盘更低、但该处 DIF 更高 → 下跌动能衰竭（看涨）
+   顶背离 = 后半段最高收盘更高、但该处 DIF 更低 → 上涨动能衰竭（看跌） */
+function 背离判定(closes, mc, 窗) {
+  const 空 = { 底背离: false, 顶背离: false, 低差: 0, 高差: 0 };
+  if (!mc || !mc.difArr) return 空;
+  const n = closes.length, dif = mc.difArr;
+  const 起 = Math.max(0, n - (窗 || 30));
+  if (n - 起 < 12) return 空;
+  const 中 = 起 + Math.floor((n - 起) / 2);
+  let 低A = 起, 高A = 起, 低B = 中, 高B = 中;
+  for (let i = 起; i < 中; i++) {
+    if (closes[i] < closes[低A]) 低A = i;
+    if (closes[i] > closes[高A]) 高A = i;
+  }
+  for (let i = 中; i < n; i++) {
+    if (closes[i] < closes[低B]) 低B = i;
+    if (closes[i] > closes[高B]) 高B = i;
+  }
+  const 底 = (低B - 低A) >= 5 && closes[低B] < closes[低A] && dif[低B] > dif[低A];
+  const 顶 = (高B - 高A) >= 5 && closes[高B] > closes[高A] && dif[高B] < dif[高A];
+  return {
+    底背离: 底, 顶背离: 顶,
+    低差: Math.round((closes[低B] - closes[低A]) / closes[低A] * 1000) / 10,
+    高差: Math.round((closes[高B] - closes[高A]) / closes[高A] * 1000) / 10,
+  };
 }
 /* B3 涨停回调形态识别：近10日内曾涨停、其后缩量回调、且不破MA10 */
 function detect涨停回调(rows, closes, ma10) {
@@ -577,9 +658,12 @@ function 昨收涨停防线(closes, 涨停序) {
 }
 function hardFilter(pool, klineMap) {
   const out = [];
+  const 统计 = { 输入: pool.length, 数据不足: 0, 均线不足: 0, 连板剔除: 0, 急涨剔除: 0,
+    均线空头: 0, 均线未上行: 0, 死叉剔除: 0, 均线死叉剔除: 0, 顶背离剔除: 0, 形态不符: 0,
+    通过: 0, 金叉票: 0, 均线金叉票: 0, 底背离票: 0 };
   for (const p of pool) {
     const rows = klineMap[p.code];
-    if (!rows || rows.length < 35) continue;
+    if (!rows || rows.length < 35) { 统计.数据不足++; continue; }
     rows.sort((a, b) => (a.TRADE_DATE < b.TRADE_DATE ? -1 : 1));
     const closes = rows.map((r) => r.CLOSE_PRICE);
     const ma5 = calcMA(closes, 5),
@@ -588,7 +672,7 @@ function hardFilter(pool, klineMap) {
     const ma5p = calcMA(closes.slice(0, -1), 5),
       ma10p = calcMA(closes.slice(0, -1), 10),
       ma30p = calcMA(closes.slice(0, -1), 30);
-    if (ma5 == null || ma10 == null || ma30 == null || ma5p == null) continue;
+    if (ma5 == null || ma10 == null || ma30 == null || ma5p == null) { 统计.均线不足++; continue; }
     // 接近连板过滤：近5个交易日出现≥2次涨停/接近涨停（按板块涨停线）即视为连板/接近连板，剔除追高接盘
     const 涨停线 = p.code.charAt(0) === "3" || p.code.startsWith("688") ? 0.198 : 0.098;
     let 近5涨停 = 0;
@@ -596,21 +680,37 @@ function hardFilter(pool, klineMap) {
       const 昨 = closes[i - 1];
       if (昨 > 0 && (closes[i] - 昨) / 昨 >= 涨停线 * 0.98) 近5涨停++;
     }
-    if (近5涨停 >= CFG.连板阈值) continue; // 连板/接近连板剔除阈值（复盘自适应）
+    if (近5涨停 >= CFG.连板阈值) { 统计.连板剔除++; continue; } // 连板/接近连板剔除阈值（复盘自适应）
     // 急涨（近似90度斜率）过滤：近5个交易日累计涨幅过大视为竖直拉升，避免高位接盘（用户要求，复盘自适应）
     const 近5涨幅 = closes.length >= 6 && closes[closes.length - 6] > 0
       ? ((closes[closes.length - 1] - closes[closes.length - 6]) / closes[closes.length - 6]) * 100
       : 0;
-    if (近5涨幅 >= CFG.急涨上限) continue; // 斜率过陡剔除阈值（复盘自适应）
-    if (!(ma5 > ma10 && ma10 > ma30)) continue; // 均线多头
-    if (!(ma5 > ma5p && ma10 > ma10p && ma30 > ma30p)) continue; // 同步上行
+    if (近5涨幅 >= CFG.急涨上限) { 统计.急涨剔除++; continue; } // 斜率过陡剔除阈值（复盘自适应）
+    if (!(ma5 > ma10 && ma10 > ma30)) { 统计.均线空头++; continue; } // 均线多头
+    if (!(ma5 > ma5p && ma10 > ma10p && ma30 > ma30p)) { 统计.均线未上行++; continue; } // 同步上行
     const last = closes[closes.length - 1];
     const mc = macdSeries(closes);
+    /* ── 金叉/死叉/背离（2026-10-16 用户策略：金叉选股、死叉排除、底/顶背离）──
+       死叉 = 走弱初期（近 CFG.死叉窗口 日 DIF 下穿 DEA）→ 硬剔除；
+       均线死叉 = MA5 下穿 MA10 → 硬剔除；
+       顶背离 = 价创新高而 DIF 走低（上涨动能衰竭）→ 硬剔除；
+       金叉 / 底背离 → 不剔除，作为加分优选（见 scoreTechDetail / buildPicks） */
+    const 死叉序 = macd死叉序(mc, CFG.死叉窗口);
+    /* 死叉排除的边界：MACD 死叉 + 跌破 MA10（破位确认）才剔除。
+       理由——B3 涨停回调形态本质是回踩，回踩中 MACD 短期死叉常见且健康；
+       若一律剔除会误杀缩量回踩的强势票。破位（收盘 < MA10）才代表回踩失败、动能转弱。 */
+    if (死叉序 > 0 && last < ma10) { 统计.死叉剔除++; continue; }
+    const 均线死叉序 = 均线交叉序(closes, CFG.死叉窗口, false);
+    if (均线死叉序 > 0) { 统计.均线死叉剔除++; continue; }
+    const 背离 = 背离判定(closes, mc, CFG.背离窗口);
+    if (背离.顶背离) { 统计.顶背离剔除++; continue; }
+    const 金叉序 = macd金叉序(mc, CFG.金叉窗口);
+    const 均线金叉序 = 均线交叉序(closes, CFG.金叉窗口, true);
     const 红柱 = !!(mc && mc.dif > mc.dea && mc.hist > 0);
     // MACD 红柱必须处于「加长阶段」：当前红柱 > 前一根红柱（动能增强）；缩短阶段剔除，避免强弩之末
     const 红柱加长 = !!(红柱 && mc.histPrev != null && mc.hist > mc.histPrev);
     const 涨停回调 = detect涨停回调(rows, closes, ma10);
-    if (!((last >= ma5 && 红柱加长) || 涨停回调)) continue;
+    if (!((last >= ma5 && 红柱加长) || 涨停回调)) { 统计.形态不符++; continue; }
     let redDays = 0;
     if (mc && mc.histArr)
       for (let d = mc.histArr.length - 1; d >= 0; d--) {
@@ -619,8 +719,14 @@ function hardFilter(pool, klineMap) {
       }
     let h20 = 0;
     for (let h = Math.max(0, closes.length - 20); h < closes.length; h++) if (closes[h] > h20) h20 = closes[h];
-    out.push({ p, ma5, ma10, ma30, redDays, h20, 涨停回调, 红柱加长, 近5涨幅: Math.round(近5涨幅 * 10) / 10 });
+    out.push({ p, ma5, ma10, ma30, redDays, h20, 涨停回调, 红柱加长, 近5涨幅: Math.round(近5涨幅 * 10) / 10,
+      金叉序, 均线金叉序, 底背离: 背离.底背离, 背离 });
+    统计.通过++;
+    if (金叉序 > 0) 统计.金叉票++;
+    if (均线金叉序 > 0) 统计.均线金叉票++;
+    if (背离.底背离) 统计.底背离票++;
   }
+  过滤统计.本次 = 统计;
   return out;
 }
 function scoreFund(roe, yoy, gm, pe) {
@@ -703,6 +809,10 @@ function scoreTechDetail(it, p) {
   const 量比分 = Math.round(Math.min(3, Math.max(0, (vr - 1) * 1.5)) * 10) / 10;
   项.push({ 名称: "量能比", 得分: 量比分, 满分: 3, 说明: `量比 ${Math.round(vr * 10) / 10}（1~3 倍为健康放量）` });
   if (it.涨停回调) 项.push({ 名称: "涨停回调形态", 得分: 0, 满分: 0, 加分: 0, 说明: `${it.涨停回调.回调天数} 日内涨停，缩量 ${it.涨停回调.缩量比}%（强势回踩，综合分额外 +3）` });
+  /* 技术形态信号（2026-10-16 新增）：展示用，加分在 buildPicks 里计入综合分（100 分制） */
+  if (it.底背离) 项.push({ 名称: "底背离", 得分: 0, 满分: 0, 加分: 0, 说明: `价创新低而 MACD 抬高（${it.背离 && it.背离.低差 != null ? "低点差 " + it.背离.低差 + "%" : "下跌动能衰竭"}，综合分额外 +${CFG.底背离加分}）` });
+  if (it.金叉序 > 0) 项.push({ 名称: "MACD金叉启动", 得分: 0, 满分: 0, 加分: 0, 说明: `${it.金叉序} 日前 DIF 上穿 DEA（综合分额外 +${CFG.金叉加分}）` });
+  if (it.均线金叉序 > 0) 项.push({ 名称: "均线金叉", 得分: 0, 满分: 0, 加分: 0, 说明: `${it.均线金叉序} 日前 MA5 上穿 MA10（综合分额外 +${CFG.均线金叉加分}）` });
   const 总 = 项.reduce((a, b) => a + (b.满分 ? b.得分 : 0), 0);
   return { 分: Math.min(10, Math.round(总 * 10) / 10), 项 };
 }
@@ -781,9 +891,17 @@ function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已�
     if (isMain) score += 5;
     const 回调加分 = it.涨停回调 ? 3 : 0;
     if (it.涨停回调) score += 3;
+    /* 技术形态加分（2026-10-16 用户策略）：金叉启动 / 均线金叉 / 底背离 → 优选加分。
+       金叉不设为必要条件——与「红柱加长」叠加会使候选池枯竭；死叉/顶背离已在 hardFilter 硬剔除 */
+    const 技术形态加分 = (it.金叉序 > 0 ? CFG.金叉加分 : 0)
+      + (it.均线金叉序 > 0 ? CFG.均线金叉加分 : 0)
+      + (it.底背离 ? CFG.底背离加分 : 0);
+    if (技术形态加分) score += 技术形态加分;
     score = Math.round(Math.min(100, score) * 10) / 10;
     let buyType;
-    if (it.涨停回调) buyType = "涨停回调(B3)";
+    if (it.底背离) buyType = "底背离买(B5)";
+    else if (it.金叉序 > 0 && it.金叉序 <= 3) buyType = "金叉买(B4)";
+    else if (it.涨停回调) buyType = "涨停回调(B3)";
     else if (p.chg < 5 && p.vr > 1.5) buyType = "突破买(B1)";
     else buyType = "回踩买(B2)";
     const buyPrice = buyType === "突破买(B1)" ? Math.round(it.h20 * 1.005 * 100) / 100 : Math.round(it.ma10 * 1.005 * 100) / 100;
@@ -986,8 +1104,6 @@ export {
   getDTPool,
   取日K,
   batchKlines,
-  batchNews,
-  analyzeSentiment,
   批行业,
   上一交易日,
   取行情文本,
