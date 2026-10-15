@@ -1,0 +1,29 @@
+name: 策略演练（dryrun · 不写档）
+
+# 用途：量化技术形态策略（金叉选股 / 死叉排除 / 底顶背离）对候选池的影响。
+# 只读演练——不写 recs.json / KV，不参与定时，不影响当日定稿冻结机制。
+# 手动触发：GitHub → Actions → 策略演练（dryrun）→ Run workflow
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dryrun:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 运行策略演练（不写档）
+        run: node dryrun.js
