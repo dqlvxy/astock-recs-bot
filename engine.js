@@ -17,7 +17,9 @@ function 读动态参数() {
     金叉窗口: 5, 死叉窗口: 3, 背离窗口: 30, 金叉加分: 2, 均线金叉加分: 1, 底背离加分: 4,
     /* 金叉必选 = 1：技术信号票（MACD金叉 / 均线金叉 / 底背离）≥5 只时只从信号票中选股；
        <5 只时自动放宽（全部候选参与、加分仍生效），避免弱势市况选不出票而空仓 */
-    金叉必选: 1 };
+    金叉必选: 1,
+    /* 降频不空仓（2026-10-16 用户要求）：温度分档决定推荐只数，弱市不再是空仓而是压缩数量 */
+    常态只数: 5, 弱市只数: 3, 冰点只数: 2, 极弱只数: 1 };
   const 钳 = (v, lo, hi) => (typeof v === "number" && isFinite(v) ? Math.min(hi, Math.max(lo, v)) : null);
   try {
     if (existsSync("params.json")) {
@@ -30,6 +32,7 @@ function 读动态参数() {
       v("金叉窗口", 2, 15); v("死叉窗口", 1, 10); v("背离窗口", 15, 60);
       v("金叉加分", 0, 6); v("均线金叉加分", 0, 5); v("底背离加分", 0, 8);
       v("金叉必选", 0, 1);
+      v("常态只数", 3, 8); v("弱市只数", 1, 5); v("冰点只数", 1, 4); v("极弱只数", 1, 3);
     }
   } catch (e) {}
   return def;
@@ -225,7 +228,9 @@ function temperature(idxs, zt, dtN, zbN, breadth) {
      ② 涨停数占 30 分、最高连板占 20 分——普跌日涨停是极少数逆势票、连板高度由少数资金抱团，
         都不能代表市场人气，却合计贡献 40 分；
      ③ 指数项只取上证且硬顶（shChg<-1 顶 55）在 -1.59% 时未触发，深成指/创业板跌幅完全没计入。
-     新算法满分 100：广度 30 + 涨停 18 + 连板 8 + 跌停 18 + 炸板 12 + 指数 14。 */
+     新算法满分 100：广度 30 + 涨停 14 + 连板 6 + 跌停 18 + 炸板 10 + **大盘 22**。
+     2026-10-16 二次调整（用户要求「大盘权重拉高一点」）：大盘项 14→22（斜率 8→10），
+     涨停 18→14、连板 8→6、炸板 12→10 让出 8 分——大盘涨跌对温度的影响显著加大。 */
   let shChg = 0, 指和 = 0, 指数 = 0;
   for (const x of idxs) {
     const raw = x.f3 || 0;
@@ -246,16 +251,17 @@ function temperature(idxs, zt, dtN, zbN, breadth) {
   } else {
     s += 15;
   }
-  /* ② 涨停数 18 分（原 30 分下调） */
-  s += Math.min(18, (zt.length / 45) * 18);
-  /* ③ 最高连板 8 分（原 20 分下调：弱市连板不代表人气） */
-  s += Math.min(8, (maxLb / 5) * 8);
+  /* ② 涨停数 14 分（原 30 → 18 → 14：普跌日涨停是极少数逆势票） */
+  s += Math.min(14, (zt.length / 45) * 14);
+  /* ③ 最高连板 6 分（原 20 → 8 → 6：弱市连板不代表人气） */
+  s += Math.min(6, (maxLb / 5) * 6);
   /* ④ 跌停数 18 分（原 15 分上调：跌停潮是恐慌信号，28 家应清零该项） */
   s += Math.max(0, 18 - dtN * 1.2);
-  /* ⑤ 炸板率 12 分（原 20 分，惩罚力度保持） */
-  s += Math.max(0, 12 - Math.max(0, zbRate - 15) * 1.2);
-  /* ⑥ 指数 14 分：改用三大指数均值（深成指/创业板同日跌幅同样计入） */
-  s += Math.max(0, 14 - Math.max(0, -指均) * 8);
+  /* ⑤ 炸板率 10 分（原 20 → 12 → 10） */
+  s += Math.max(0, 10 - Math.max(0, zbRate - 15) * 1.2);
+  /* ⑥ 大盘 22 分（2026-10-16 拉高：原 14 分）：三大指数均值，深成指/创业板跌幅同样计入；
+     斜率 10 → 指数均跌 2.2% 该项清零（原 8 → 1.75% 清零） */
+  s += Math.max(0, 22 - Math.max(0, -指均) * 10);
   if (指均 < -1) s = Math.min(s, 60);
   if (指均 < -2) s = Math.min(s, 30);
   s = Math.max(0, Math.min(100, Math.round(s)));
@@ -688,6 +694,17 @@ function 昨收涨停防线(closes, 涨停序) {
   const 前收 = closes[涨停序 - 1];
   return 前收 + (closes[涨停序] - 前收) * 0.5;
 }
+/* 温度 → 推荐只数（降频不空仓，2026-10-16 用户要求）：
+   ≥50 常态 5 只；35~50 弱市 3 只；20~35 冰点 2 只；<20 极弱 1 只。
+   原先温度 < 门槛直接空仓，会整段错过弱市中的结构性机会，改为压缩数量、只做最高分的少数票。 */
+function 温度目标只数(t) {
+  if (t == null) return CFG.常态只数;
+  if (t >= 50) return CFG.常态只数;
+  if (t >= CFG.温度下限) return CFG.弱市只数;
+  if (t >= 20) return CFG.冰点只数;
+  return CFG.极弱只数;
+}
+
 function hardFilter(pool, klineMap) {
   const out = [];
   const 统计 = { 输入: pool.length, 数据不足: 0, 均线不足: 0, 连板剔除: 0, 急涨剔除: 0,
@@ -873,7 +890,8 @@ function scoreFundDetail(roe, yoy, gm, pe) {
   const 总 = 项.reduce((a, b) => a + b.得分, 0);
   return { 分: Math.min(10, Math.round(总 * 10) / 10), 项 };
 }
-function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已推码集) {
+function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已推码集, 目标数) {
+  const N = Math.max(1, 目标数 || 5);   // 推荐只数（温度分档决定，降频不空仓）
   const mainSet = {};
   for (const m of mainNames) mainSet[m] = 1;
   const news = {};
@@ -997,19 +1015,19 @@ function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已�
   const seen = {},
     top = [];
   for (const it2 of picks) {
-    if (top.length >= 5) break;
+    if (top.length >= N) break;
     const 键 = it2.industry || "其他";
     if (seen[键]) continue;
     seen[键] = 1;
     top.push(it2);
   }
-  if (top.length < 5) {
+  if (top.length < N) {
     for (const p of picks) {
-      if (top.length >= 5) break;
+      if (top.length >= N) break;
       if (top.indexOf(p) < 0) top.push(p);
     }
   }
-  return top.slice(0, 5);
+  return top.slice(0, N);
 }
 
 /* ── 主流程 runShort（对齐前端取短线后端契约）── */
@@ -1077,9 +1095,13 @@ async function runStable(prog, 已推码集) {
     广度 = { up, down, flat, total: up + down + flat };
   }
   const temp = temperature(idxs, zt, dtN, zbN, 广度);
-  if (temp.temp < CFG.温度下限) { // 弱市停推温度下限（复盘自适应）
-    P(18, "市场温度 " + temp.temp + " 分（" + temp.state + "，涨 " + (广度 ? 广度.up : "—") + "/跌 " + (广度 ? 广度.down : "—") + "），弱市停推");
-    return 空仓("市场温度 " + temp.temp + "（" + temp.state + "），大盘弱势降频停推，避免逆势追高");
+  /* 降频不空仓（2026-10-16 用户要求）：低于温度门槛不再空仓，改为压缩推荐只数 */
+  const 目标数 = 温度目标只数(temp.temp);
+  const 降频中 = temp.temp < CFG.温度下限;
+  if (降频中) {
+    P(18, "市场温度 " + temp.temp + " 分（" + temp.state + "，涨 " + (广度 ? 广度.up : "—") + "/跌 " + (广度 ? 广度.down : "—") + "）→ 降频 " + 目标数 + " 只（不空仓）");
+  } else if (目标数 < CFG.常态只数) {
+    P(18, "市场温度 " + temp.temp + " 分（" + temp.state + "）→ 降频 " + 目标数 + " 只");
   }
   const main = mainLines(zt);
   const mainNames = main.map((x) => x.name);
@@ -1114,7 +1136,8 @@ async function runStable(prog, 已推码集) {
     newsMap = B[1],
     flash = B[2];
   P(90, "三维打分中（消息面按个股新闻）…");
-  const picks = buildPicks(hard, fmap, flash || [], mainNames, flash !== null, newsMap, 已推码集);
+  const picks = buildPicks(hard, fmap, flash || [], mainNames, flash !== null, newsMap, 已推码集, 目标数);
+  if (目标数 < CFG.常态只数) P(88, "降频模式：本期限推 " + 目标数 + " 只（温度 " + temp.temp + " 分）");
   P(96, "三维打分完成 · 综合排序");
   if (!picks.length) return 空仓("财务过滤后无推荐（亏损或数据缺失）");
   const elapsed = Math.round((Date.now() - t0) / 100) / 10;
