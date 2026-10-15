@@ -60,7 +60,9 @@ async function 拉K线字段(sec, lmt, f1, f2, 段数) {
     if (!d || !d.data || !d.data.klines) return null;
     return d.data.klines.map((k) => {
       const 段 = k.split(",");
-      const r = { date: 段[0], close: parseFloat(段[段数 - 1]) };
+      /* f51日期,f52开,f53收,f54高,f55低,f56量,f57额：close 恒为 段[2]（7段）或 段[1]（2段回退）。
+         曾经错写成 段[段数-1]（成交额）→ 大盘涨跌 19%/-19%、ret 全错（2026-10-15 事故二） */
+      const r = { date: 段[0], close: parseFloat(段数 >= 6 ? 段[2] : 段[1]) };
       if (段数 >= 6) {
         r.open = parseFloat(段[1]); r.high = parseFloat(段[3]); r.low = parseFloat(段[4]); r.vol = parseFloat(段[5]);
       }
