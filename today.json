@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "gen_time": "2026-10-15 18:51:20",
+  "gen_time": "2026-10-15 18:58:27",
   "trade_date": "2026-10-15",
   "auction_time": "",
   "index": {
@@ -1475,11 +1475,18 @@
   "temperature": {
     "temp": 26,
     "zt_count": 36,
+    "dt_count": 39,
+    "zb_count": 24,
+    "max_lb": 5,
     "state": "冰点/退潮",
     "shChg": -1.59,
     "指均": -2.31,
     "广度": 7.1
   },
+  "pos_advice": "空仓或 ≤10% 试错，等主线明确再加仓",
+  "zt_count": 36,
+  "dt_count": 39,
+  "zb_count": 24,
   "main_lines": [
     {
       "name": "元件",
@@ -1504,7 +1511,7 @@
   ],
   "watch": {
     "ok": true,
-    "updated": "2026-10-15 18:51:20",
+    "updated": "2026-10-15 18:58:27",
     "items": [
       {
         "code": "588170",
