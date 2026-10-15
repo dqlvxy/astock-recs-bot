@@ -1,11 +1,21 @@
 name: 每日稳健版荐股 + 全模块快照
 
-# 北京时间 14:30 = UTC 06:30，周一~周五
-# 注意：GitHub 免费版 cron 可能延迟 5~20 分钟，属正常；也可用 workflow_dispatch 手动补跑
+# 北京时间 14:15 = UTC 06:15，周一~周五
+#   —— 老板流程：14:30 荐股定稿 → 14:50 尾盘买入 → 次日涨了卖。
+#   故 cron 提前到 14:15 触发，给 GitHub 免费版 cron 的 5~20 分钟延迟留缓冲，
+#   保证定稿在 14:50 买入前一定落到云端（原先 14:30 触发，实测曾延迟到 15:12 才出，
+#   用户 14:50 买入时云端还没有今日荐股，只能看本地引擎预演，导致两版不一致）。
+#   定稿一经生成即冻结：当日已有存档则 generate.js 跳过重算，不覆盖；
+#   需强制重算时用 workflow_dispatch 并勾选 force。
 on:
   schedule:
-    - cron: "30 6 * * 1-5"
+    - cron: "15 6 * * 1-5"
   workflow_dispatch:
+    inputs:
+      force:
+        description: "强制重算并覆盖当日定稿（默认否：保持当日已有定稿不变）"
+        type: boolean
+        default: false
 
 permissions:
   contents: write        # 允许把 recs.json / today.json / watch.json 提交回仓库
@@ -27,6 +37,7 @@ jobs:
         run: npm ci
 
       # ── ① 尾盘荐股：产出 recs.json（历史存档，多期累积）──────────────
+      #   当日已有定稿则跳过重算（冻结）；勾选 force 可强制覆盖。
       - name: 运行稳健版选股并生成 recs.json
         run: node generate.js
         env:
@@ -34,6 +45,7 @@ jobs:
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CF_KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
+          FORCE: ${{ github.event.inputs.force || '' }}
 
       # ── ② 全模块快照：产出 today.json（当日覆盖）+ watch.json（自选行情）
       #     覆盖前端 T1D 内嵌快照的 12 个字段：index / market_stat / zt_total /
