@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updated": "2026-10-15 16:25:23",
+  "updated": "2026-10-15 17:00:40",
   "count": 4,
   "items": [
     {
@@ -15,8 +15,8 @@
           "chg": 6.1,
           "vr": 2.5,
           "turn": 6.87,
-          "near_limit_up": null,
-          "chg5": null,
+          "near_limit_up": 1,
+          "chg5": 14.74,
           "ret": -2.84
         },
         {
@@ -27,8 +27,8 @@
           "chg": 4.11,
           "vr": 2.77,
           "turn": 5.66,
-          "near_limit_up": null,
-          "chg5": null,
+          "near_limit_up": 0,
+          "chg5": 12.29,
           "ret": 3.19
         },
         {
@@ -39,8 +39,8 @@
           "chg": 6.17,
           "vr": 1.23,
           "turn": 12.3,
-          "near_limit_up": null,
-          "chg5": null,
+          "near_limit_up": 1,
+          "chg5": 7.76,
           "ret": 1.72
         },
         {
@@ -51,8 +51,8 @@
           "chg": 1.21,
           "vr": 2.52,
           "turn": 19.2,
-          "near_limit_up": null,
-          "chg5": null,
+          "near_limit_up": 0,
+          "chg5": 9.48,
           "ret": 0.82
         },
         {
@@ -63,8 +63,8 @@
           "chg": 0.3,
           "vr": 2.87,
           "turn": 9.33,
-          "near_limit_up": null,
-          "chg5": null,
+          "near_limit_up": 0,
+          "chg5": 1.02,
           "ret": 3.02
         }
       ],
@@ -84,8 +84,8 @@
           "chg": 4.9,
           "vr": 4.28,
           "turn": 18.75,
-          "near_limit_up": null,
-          "chg5": null,
+          "near_limit_up": 1,
+          "chg5": 22.71,
           "ret": 7
         },
         {
@@ -96,8 +96,8 @@
           "chg": 3.52,
           "vr": 8.74,
           "turn": 23,
-          "near_limit_up": null,
-          "chg5": null,
+          "near_limit_up": 4,
+          "chg5": 51.59,
           "ret": -10
         },
         {
@@ -108,8 +108,8 @@
           "chg": 6.08,
           "vr": 4.23,
           "turn": 6.51,
-          "near_limit_up": null,
-          "chg5": null,
+          "near_limit_up": 0,
+          "chg5": 10.86,
           "ret": -1.85
         },
         {
@@ -120,8 +120,8 @@
           "chg": 4.42,
           "vr": 2.39,
           "turn": 2.2,
-          "near_limit_up": null,
-          "chg5": null,
+          "near_limit_up": 0,
+          "chg5": 5.21,
           "ret": -3.24
         },
         {
@@ -132,8 +132,8 @@
           "chg": 4.95,
           "vr": 3.45,
           "turn": 3.89,
-          "near_limit_up": null,
-          "chg5": null,
+          "near_limit_up": 0,
+          "chg5": 9.15,
           "ret": 1.69
         }
       ],
@@ -153,8 +153,8 @@
           "chg": 0.68,
           "vr": 1.7,
           "turn": 2.82,
-          "near_limit_up": null,
-          "chg5": null,
+          "near_limit_up": 0,
+          "chg5": 5.88,
           "ret": 1.8
         },
         {
@@ -165,8 +165,8 @@
           "chg": 2.08,
           "vr": 1.8,
           "turn": 2.9,
-          "near_limit_up": null,
-          "chg5": null,
+          "near_limit_up": 0,
+          "chg5": 5.04,
           "ret": 0.46
         },
         {
@@ -177,8 +177,8 @@
           "chg": 1.77,
           "vr": 1.65,
           "turn": 2.29,
-          "near_limit_up": null,
-          "chg5": null,
+          "near_limit_up": 0,
+          "chg5": 5.83,
           "ret": -1.21
         },
         {
@@ -189,8 +189,8 @@
           "chg": 1.32,
           "vr": 1.2,
           "turn": 9.78,
-          "near_limit_up": null,
-          "chg5": null,
+          "near_limit_up": 0,
+          "chg5": 20.18,
           "ret": 2.06
         },
         {
@@ -201,8 +201,8 @@
           "chg": 2.62,
           "vr": 1.74,
           "turn": 6.31,
-          "near_limit_up": null,
-          "chg5": null,
+          "near_limit_up": 0,
+          "chg5": 6.63,
           "ret": 0.91
         }
       ],
@@ -222,7 +222,7 @@
           "chg": 2.43,
           "vr": 1.48,
           "turn": 17.34,
-          "near_limit_up": null,
+          "near_limit_up": 0,
           "chg5": 12.2,
           "ret": -4.07
         },
@@ -234,7 +234,7 @@
           "chg": 3.89,
           "vr": 1.95,
           "turn": 3.42,
-          "near_limit_up": null,
+          "near_limit_up": 0,
           "chg5": 11.3,
           "ret": 0.52
         },
@@ -246,7 +246,7 @@
           "chg": 2.95,
           "vr": 2.05,
           "turn": 14.52,
-          "near_limit_up": null,
+          "near_limit_up": 0,
           "chg5": 11.3,
           "ret": -3.18
         },
@@ -258,7 +258,7 @@
           "chg": 3.54,
           "vr": 2.22,
           "turn": 2.69,
-          "near_limit_up": null,
+          "near_limit_up": 0,
           "chg5": 9.1,
           "ret": -0.65
         },
@@ -270,7 +270,7 @@
           "chg": 2.94,
           "vr": 1.43,
           "turn": 2.61,
-          "near_limit_up": null,
+          "near_limit_up": 0,
           "chg5": 11,
           "ret": -0.38
         }
