@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updated": "2026-10-15 08:00:43",
+  "updated": "2026-10-15 16:25:23",
   "count": 4,
   "items": [
     {
@@ -69,7 +69,7 @@
         }
       ],
       "verifiable": true,
-      "market_chg": 1.8150388936905708,
+      "market_chg": -0.7883524760618283,
       "success": 4
     },
     {
@@ -138,7 +138,7 @@
         }
       ],
       "verifiable": true,
-      "market_chg": 1.2079378774805916,
+      "market_chg": -0.43395152853199,
       "success": 2
     },
     {
@@ -207,7 +207,7 @@
         }
       ],
       "verifiable": true,
-      "market_chg": -1.3640238704177334,
+      "market_chg": 0.09533239932162164,
       "success": 4
     },
     {
@@ -276,7 +276,7 @@
         }
       ],
       "verifiable": true,
-      "market_chg": -0.6050129645635288,
+      "market_chg": -0.8847997558447327,
       "success": 1
     }
   ]
