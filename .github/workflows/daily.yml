@@ -9,7 +9,12 @@ name: 每日稳健版荐股 + 全模块快照
 #   需强制重算时用 workflow_dispatch 并勾选 force。
 on:
   schedule:
+    # 三个触发点 = 自带重试（GitHub 免费版 cron 延迟不可控，实测曾从 14:30 拖到 15:12）：
+    #   14:05 主跑 → 14:20 兜底 → 14:35 再兜底（配合下方「今日定稿闸门」，已有定稿则整套秒退，绝不重复推荐）
+    #   最坏 14:35 触发 + 3 分钟跑完 = 14:38 落地，仍赶在 14:50 买入前。
     - cron: "5 6 * * 1-5"
+    - cron: "20 6 * * 1-5"
+    - cron: "35 6 * * 1-5"
   workflow_dispatch:
     inputs:
       force:
@@ -36,9 +41,33 @@ jobs:
       - name: 安装依赖
         run: npm ci
 
+      # ── ⓪ 今日定稿闸门（多触发点的关键，别删）────────────────────────
+      #   三个 cron 触发点共用一套流程，若今日定稿已存在则后续选股/快照全部不是跑，
+      #   既保证「最迟 14:38 一定有定稿」，又不会重复推荐、不浪费 Actions 分钟。
+      #   force=1（手动勾选）时跳过闸门，强制执行。
+      - name: 今日定稿闸门
+        id: gate
+        shell: bash
+        run: |
+          if [ "${{ github.event.inputs.force || '' }}" = "true" ]; then
+            echo "已勾选 force，跳过闸门"; echo "already=0" >> $GITHUB_OUTPUT; exit 0
+          fi
+          TODAY=$(TZ=Asia/Shanghai date +%Y%m%d)
+          HAVE=$(python3 -c "
+import json
+try:
+    d=json.load(open('recs.json',encoding='utf-8'))
+    print(1 if any(str(g.get('date','')).replace('-','')=='$TODAY' and g.get('picks') for g in d.get('recs',[])) else 0)
+except Exception:
+    print(0)
+")
+          echo "today=$TODAY already=$HAVE"
+          echo "already=$HAVE" >> $GITHUB_OUTPUT
+
       # ── ① 尾盘荐股：产出 recs.json（历史存档，多期累积）──────────────
       #   当日已有定稿则跳过重算（冻结）；勾选 force 可强制覆盖。
       - name: 运行稳健版选股并生成 recs.json
+        if: steps.gate.outputs.already != '1'
         run: node generate.js
         env:
           # 若配了这三个 Secret（且 token 有 KV 权限）则写 KV；否则自动写 recs.json
@@ -53,6 +82,7 @@ jobs:
       #     自选清单从 watchlist.json 读（不存在则用内置兜底 7 只），
       #     个股走东财全市场、ETF/LOF 走腾讯行情补齐名称与换手。
       - name: 生成全模块云端快照 today.json + watch.json
+        if: steps.gate.outputs.already != '1'
         run: node today.js
         env:
           TODAY_FILE: today.json
