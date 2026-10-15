@@ -260,7 +260,10 @@ function temperature(idxs, zt, dtN, zbN, breadth) {
   if (指均 < -2) s = Math.min(s, 30);
   s = Math.max(0, Math.min(100, Math.round(s)));
   const state = s >= 70 ? "强势" : s >= 50 ? "中性偏强" : s >= 35 ? "中性偏弱" : "冰点/退潮";
-  return { temp: s, zt_count: zt.length, state: state, shChg: shChg, 指均: Math.round(指均 * 100) / 100,
+  /* dt_count/zb_count/max_lb（2026-10-16 补）：看板温度卡片读这三个字段，
+     此前云端从未提供 → 跌停/炸板显示「--」（用户截图实测）。与温度构成同源，可追溯。 */
+  return { temp: s, zt_count: zt.length, dt_count: dtN, zb_count: zbN, max_lb: maxLb,
+           state: state, shChg: shChg, 指均: Math.round(指均 * 100) / 100,
            广度: breadth && breadth.total ? Math.round((breadth.up / breadth.total) * 1000) / 10 : null };
 }
 
