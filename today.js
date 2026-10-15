@@ -487,10 +487,34 @@ async function main() {
   console.log("  [6/7] 龙虎榜 / 温度 / 主线…");
   const 交易键 = 无横(数据日);
   const lhb = await 建龙虎榜(交易键);
-  const 温 = temperature(index ? Object.entries(index).map(([k, v]) => ({
+  const 温0 = temperature(index ? Object.entries(index).map(([k, v]) => ({
     f12: k === "sh" ? "000001" : k === "sz" ? "399001" : "399006",
     f3: v.chg_pct, f2: v.price, f14: v.name,
   })) : [], zt, dtN, zbN);
+  /* 温度字段补齐（2026-10-15）：engine.temperature() 只返回 {temp,zt_count,state,shChg}，
+     而看板温度卡还需要 dt_count / zb_count / max_lb / pos_advice。
+     按「本地只做显示、数据全部云端出」原则，在此用同源数据（涨停池/跌停池/炸板数/连板梯队）补齐，
+     全部来自本轮已取到的变量，不做二次网络请求。 */
+  const 最高连板 = (() => {
+    let m = 0;
+    for (const k in ladder) {
+      if (!(ladder[k] || []).length) continue;
+      const n = k === "4p" ? 4 : Number(k) || 0;
+      if (n > m) m = n;
+    }
+    return m;
+  })();
+  const 温 = Object.assign({}, 温0, {
+    zt_count: 温0.zt_count != null ? 温0.zt_count : (zt ? zt.length : 0),
+    dt_count: 温0.dt_count != null ? 温0.dt_count : (dtN ? dtN.length : 0),
+    zb_count: 温0.zb_count != null ? 温0.zb_count : zbN,
+    max_lb: 温0.max_lb != null ? 温0.max_lb : 最高连板,
+    pos_advice: 温0.pos_advice ||
+      (温0.temp >= 70 ? "总仓位 60-80%，可适度追强"
+        : 温0.temp >= 50 ? "总仓位 40-60%，低吸为主不追高"
+        : 温0.temp >= 35 ? "总仓位 20-40%，只做确定性最高 1-2 只"
+        : "空仓或 ≤10% 试错"),
+  });
   const 主线 = mainLines(zt);
 
   /* ⑦ 自选关注行情 */
