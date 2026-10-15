@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "updated": "2026-10-14 08:00:20",
-  "count": 3,
+  "updated": "2026-10-15 08:00:43",
+  "count": 4,
   "items": [
     {
       "date": "20261008",
@@ -16,6 +16,7 @@
           "vr": 2.5,
           "turn": 6.87,
           "near_limit_up": null,
+          "chg5": null,
           "ret": -2.84
         },
         {
@@ -27,6 +28,7 @@
           "vr": 2.77,
           "turn": 5.66,
           "near_limit_up": null,
+          "chg5": null,
           "ret": 3.19
         },
         {
@@ -38,6 +40,7 @@
           "vr": 1.23,
           "turn": 12.3,
           "near_limit_up": null,
+          "chg5": null,
           "ret": 1.72
         },
         {
@@ -49,6 +52,7 @@
           "vr": 2.52,
           "turn": 19.2,
           "near_limit_up": null,
+          "chg5": null,
           "ret": 0.82
         },
         {
@@ -60,6 +64,7 @@
           "vr": 2.87,
           "turn": 9.33,
           "near_limit_up": null,
+          "chg5": null,
           "ret": 3.02
         }
       ],
@@ -80,6 +85,7 @@
           "vr": 4.28,
           "turn": 18.75,
           "near_limit_up": null,
+          "chg5": null,
           "ret": 7
         },
         {
@@ -91,6 +97,7 @@
           "vr": 8.74,
           "turn": 23,
           "near_limit_up": null,
+          "chg5": null,
           "ret": -10
         },
         {
@@ -102,6 +109,7 @@
           "vr": 4.23,
           "turn": 6.51,
           "near_limit_up": null,
+          "chg5": null,
           "ret": -1.85
         },
         {
@@ -113,6 +121,7 @@
           "vr": 2.39,
           "turn": 2.2,
           "near_limit_up": null,
+          "chg5": null,
           "ret": -3.24
         },
         {
@@ -124,6 +133,7 @@
           "vr": 3.45,
           "turn": 3.89,
           "near_limit_up": null,
+          "chg5": null,
           "ret": 1.69
         }
       ],
@@ -144,6 +154,7 @@
           "vr": 1.7,
           "turn": 2.82,
           "near_limit_up": null,
+          "chg5": null,
           "ret": 1.8
         },
         {
@@ -155,6 +166,7 @@
           "vr": 1.8,
           "turn": 2.9,
           "near_limit_up": null,
+          "chg5": null,
           "ret": 0.46
         },
         {
@@ -166,6 +178,7 @@
           "vr": 1.65,
           "turn": 2.29,
           "near_limit_up": null,
+          "chg5": null,
           "ret": -1.21
         },
         {
@@ -177,6 +190,7 @@
           "vr": 1.2,
           "turn": 9.78,
           "near_limit_up": null,
+          "chg5": null,
           "ret": 2.06
         },
         {
@@ -188,12 +202,82 @@
           "vr": 1.74,
           "turn": 6.31,
           "near_limit_up": null,
+          "chg5": null,
           "ret": 0.91
         }
       ],
       "verifiable": true,
       "market_chg": -1.3640238704177334,
       "success": 4
+    },
+    {
+      "date": "20261014",
+      "gen_time": "2026-10-14 12:20:32",
+      "picks": [
+        {
+          "code": "300182",
+          "name": "捷成股份",
+          "score": 44.8,
+          "prob": 50.6,
+          "chg": 2.43,
+          "vr": 1.48,
+          "turn": 17.34,
+          "near_limit_up": null,
+          "chg5": 12.2,
+          "ret": -4.07
+        },
+        {
+          "code": "600285",
+          "name": "羚锐制药",
+          "score": 40.6,
+          "prob": 48.5,
+          "chg": 3.89,
+          "vr": 1.95,
+          "turn": 3.42,
+          "near_limit_up": null,
+          "chg5": 11.3,
+          "ret": 0.52
+        },
+        {
+          "code": "002292",
+          "name": "奥飞娱乐",
+          "score": 37.4,
+          "prob": 41.1,
+          "chg": 2.95,
+          "vr": 2.05,
+          "turn": 14.52,
+          "near_limit_up": null,
+          "chg5": 11.3,
+          "ret": -3.18
+        },
+        {
+          "code": "600993",
+          "name": "马应龙",
+          "score": 35.2,
+          "prob": 42.4,
+          "chg": 3.54,
+          "vr": 2.22,
+          "turn": 2.69,
+          "near_limit_up": null,
+          "chg5": 9.1,
+          "ret": -0.65
+        },
+        {
+          "code": "002027",
+          "name": "分众传媒",
+          "score": 32.6,
+          "prob": 38.3,
+          "chg": 2.94,
+          "vr": 1.43,
+          "turn": 2.61,
+          "near_limit_up": null,
+          "chg5": 11,
+          "ret": -0.38
+        }
+      ],
+      "verifiable": true,
+      "market_chg": -0.6050129645635288,
+      "success": 1
     }
   ]
 }
