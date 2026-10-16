@@ -18,7 +18,7 @@ function 读动态参数() {
     /* 强势延续策略（2026-10-16 新增，90 交易日回溯驱动）：
        昨涨停 + 今涨幅 ≥ 强势延续下限 → 次日 +2.06%、胜率 57%（526 只次）；
        昨涨停 + 今浅回踩(-3%~+0.5%) → 次日 +0.79%、胜率 54%。两者均豁免追高上限。 */
-    强势延续下限: 5, 回调回踩下限: -3, 回调回踩上限: 0.5,
+    强势延续下限: 5, 回调回踩下限: -3, 回调回踩上限: 0.5, 强势延续只数: 1,
     /* 金叉必选 = 1：技术信号票（MACD金叉 / 均线金叉 / 底背离）≥5 只时只从信号票中选股；
        <5 只时自动放宽（全部候选参与、加分仍生效），避免弱势市况选不出票而空仓 */
     金叉必选: 1,
@@ -37,6 +37,7 @@ function 读动态参数() {
       v("金叉加分", 0, 6); v("均线金叉加分", 0, 5); v("底背离加分", 0, 8);
       v("金叉必选", 0, 1);
       v("强势延续下限", 3, 9.5); v("回调回踩下限", -6, 0); v("回调回踩上限", 0, 3);
+      v("强势延续只数", 1, 3);
       v("常态只数", 3, 8); v("弱市只数", 1, 5); v("冰点只数", 1, 4); v("极弱只数", 1, 3);
     }
   } catch (e) {}
@@ -548,8 +549,11 @@ function scan(cands, ztCodes) {
        原初筛把 ≥追高上限 一刀切掉，导致这类票永远无法入选（也解释了 B3/B6 从未触发）。
        此处只截在涨停线前（封死涨停的票尾盘买不到）。 */
     if (chg >= 9.8) continue;
-    if (vr == null || vr < CFG.量比下限 || vr > CFG.量比上限) continue; // 量比区间（情绪票剔除，区间由复盘自适应）
-    if (turn == null || turn < CFG.换手下限 || turn > CFG.换手上限) continue; // 换手区间（情绪票剔除，区间由复盘自适应）
+    /* 2026-10-16：量比/换手同追高一样从初筛移到 hardFilter 精判 ——
+       强势延续票（昨涨停+今续强）天然高量比高换手，被初筛区间挡在门外
+       （实测：皇台酒业换手 25% 超上限；新华文轩量比盘中飙升）。初筛只留宽松边界。 */
+    if (vr == null || vr < 0.5 || vr > 20) continue; // 量比宽松边界（精判见 hardFilter）
+    if (turn == null || turn < 1 || turn > 80) continue; // 换手宽松边界（精判见 hardFilter）
     if (fmv < 20 || fmv > 800) continue; // 流通市值 20-800亿
     if (price > 60) continue; // 股价 <= 60（用户放宽）
     if (code.startsWith("688")) continue; // 排除科创板（用户要求，仅留沪深主板+创业）
@@ -755,7 +759,7 @@ function hardFilter(pool, klineMap) {
   const out = [];
   const 统计 = { 输入: pool.length, 数据不足: 0, 均线不足: 0, 连板剔除: 0, 急涨剔除: 0,
     均线空头: 0, 均线未上行: 0, 死叉剔除: 0, 均线死叉剔除: 0, 顶背离剔除: 0, 形态不符: 0,
-    追高剔除: 0, 通过: 0, 金叉票: 0, 均线金叉票: 0, 底背离票: 0, 强势延续票: 0, 涨停回调票: 0 };
+    追高剔除: 0, 量比剔除: 0, 换手剔除: 0, 通过: 0, 金叉票: 0, 均线金叉票: 0, 底背离票: 0, 强势延续票: 0, 涨停回调票: 0 };
   for (const p of pool) {
     const rows = klineMap[p.code];
     if (!rows || rows.length < 35) { 统计.数据不足++; continue; }
@@ -818,6 +822,11 @@ function hardFilter(pool, klineMap) {
     /* 追高精判（2026-10-16 从初筛移入）：涨幅 ≥ 追高上限 且 非「强势延续」→ 剔除；
        强势延续票（昨涨停+今续强）豁免，因此类组合实测次日 +2.06%/胜率 57%。 */
     if (p.chg != null && p.chg >= CFG.追高上限 && !强势延续) { 统计.追高剔除++; continue; }
+    /* 量比/换手精判（2026-10-16 从初筛移入）：非强势延续票仍按自适应区间剔除，强势延续票豁免 */
+    if (!强势延续) {
+      if (p.vr == null || p.vr < CFG.量比下限 || p.vr > CFG.量比上限) { 统计.量比剔除++; continue; }
+      if (p.turn == null || p.turn < CFG.换手下限 || p.turn > CFG.换手上限) { 统计.换手剔除++; continue; }
+    }
     if (!((last >= ma5 && 红柱加长) || 涨停回调 || 强势延续)) { 统计.形态不符++; continue; }
     let redDays = 0;
     if (mc && mc.histArr)
@@ -1077,17 +1086,24 @@ function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已�
 
   const seen = {},
     top = [];
+  /* 强势延续票限量（2026-10-16）：这类票（昨涨停+今续强、多数均线未走好）波动更大，
+     单期最多纳入 CFG.强势延续只数（默认 1），避免风险敞口过度集中。 */
+  let 强势延续已选 = 0;
+  const 可加 = (it) => !(it.强势延续 && 强势延续已选 >= (CFG.强势延续只数 || 1));
+  const 记入 = (it) => { if (it.强势延续) 强势延续已选++; };
   for (const it2 of picks) {
     if (top.length >= N) break;
+    if (!可加(it2)) continue;
     const 键 = it2.industry || "其他";
     if (seen[键]) continue;
     seen[键] = 1;
-    top.push(it2);
+    top.push(it2); 记入(it2);
   }
   if (top.length < N) {
     for (const p of picks) {
       if (top.length >= N) break;
-      if (top.indexOf(p) < 0) top.push(p);
+      if (!可加(p)) continue;
+      if (top.indexOf(p) < 0) { top.push(p); 记入(p); }
     }
   }
   return top.slice(0, N);
