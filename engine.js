@@ -775,7 +775,12 @@ function hardFilter(pool, klineMap) {
       const 昨 = closes[i - 1];
       if (昨 > 0 && (closes[i] - 昨) / 昨 >= 涨停线 * 0.98) 近5涨停++;
     }
-    if (近5涨停 >= CFG.连板阈值) { 统计.连板剔除++; continue; } // 连板/接近连板剔除阈值（复盘自适应）
+    /* 2026-10-16：强势延续票豁免连板剔除——「昨涨停+今续强」的组合天然属于近 5 日≥2 次涨停，
+       若不豁免，新策略（实测次日 +2.06%、胜率 57%）将永远无法入选，成为死代码。
+       实测根因：dryrun 中 10-16 的 2 只合格票（皇台酒业/新华文轩）分别被换手上限与连板剔除挡掉。 */
+    /* 强势延续判定必须放在连板剔除之前（只需收盘价序列与代码，不依赖均线） */
+    const 强势延续 = detect强势延续(rows, closes, p.code);
+    if (近5涨停 >= CFG.连板阈值 && !强势延续) { 统计.连板剔除++; continue; } // 连板阈值（复盘自适应；强势延续豁免）
     // 急涨（近似90度斜率）过滤：近5个交易日累计涨幅过大视为竖直拉升，避免高位接盘（用户要求，复盘自适应）
     const 近5涨幅 = closes.length >= 6 && closes[closes.length - 6] > 0
       ? ((closes[closes.length - 1] - closes[closes.length - 6]) / closes[closes.length - 6]) * 100
@@ -805,7 +810,6 @@ function hardFilter(pool, klineMap) {
     // MACD 红柱必须处于「加长阶段」：当前红柱 > 前一根红柱（动能增强）；缩短阶段剔除，避免强弩之末
     const 红柱加长 = !!(红柱 && mc.histPrev != null && mc.hist > mc.histPrev);
     const 涨停回调 = detect涨停回调(rows, closes, ma10);
-    const 强势延续 = detect强势延续(rows, closes, p.code);
     /* 追高精判（2026-10-16 从初筛移入）：涨幅 ≥ 追高上限 且 非「强势延续」→ 剔除；
        强势延续票（昨涨停+今续强）豁免，因此类组合实测次日 +2.06%/胜率 57%。 */
     if (p.chg != null && p.chg >= CFG.追高上限 && !强势延续) { 统计.追高剔除++; continue; }
