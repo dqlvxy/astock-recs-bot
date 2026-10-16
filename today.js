@@ -33,7 +33,7 @@ const 无横 = (k) => String(k || "").replace(/-/g, "");
 async function 建指数() {
   const idx = await getIndex();
   const out = {};
-  const 映 = { "000001": "sh", "399001": "sz", "399006": "cyb" };
+  const 映 = { "000001": "sh", "399001": "sz", "399006": "cyb", "000688": "kc50" };
   for (const x of idx || []) {
     const k = 映[x.f12] || (x.f12 === "000001" ? "sh" : null);
     if (!k) continue;
@@ -449,7 +449,7 @@ async function main() {
   const lhb = await 建龙虎榜(交易键);
   /* 2026-10-16：温度重构，传入涨跌家数（market_stat 已算好：up/down/flat/total） */
   const 温 = temperature(index ? Object.entries(index).map(([k, v]) => ({
-    f12: k === "sh" ? "000001" : k === "sz" ? "399001" : "399006",
+    f12: k === "sh" ? "000001" : k === "sz" ? "399001" : k === "cyb" ? "399006" : "000688",
     f3: v.chg_pct, f2: v.price, f14: v.name,
   })) : [], zt, dtN, zbN, market_stat || null);
   const 主线 = mainLines(zt);
