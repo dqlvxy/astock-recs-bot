@@ -15,6 +15,10 @@ function 读动态参数() {
   const def = { 追高上限: 5, 量比下限: 1, 量比上限: 5, 换手下限: 2, 换手上限: 20, 温度下限: 35, 连板阈值: 2, 止损率: 0.92, 急涨上限: 30,
     /* 技术形态策略参数（2026-10-16 新增：金叉选股 / 死叉排除 / 底顶背离） */
     金叉窗口: 5, 死叉窗口: 3, 背离窗口: 30, 金叉加分: 2, 均线金叉加分: 1, 底背离加分: 4,
+    /* 强势延续策略（2026-10-16 新增，90 交易日回溯驱动）：
+       昨涨停 + 今涨幅 ≥ 强势延续下限 → 次日 +2.06%、胜率 57%（526 只次）；
+       昨涨停 + 今浅回踩(-3%~+0.5%) → 次日 +0.79%、胜率 54%。两者均豁免追高上限。 */
+    强势延续下限: 5, 回调回踩下限: -3, 回调回踩上限: 0.5,
     /* 金叉必选 = 1：技术信号票（MACD金叉 / 均线金叉 / 底背离）≥5 只时只从信号票中选股；
        <5 只时自动放宽（全部候选参与、加分仍生效），避免弱势市况选不出票而空仓 */
     金叉必选: 1,
@@ -32,6 +36,7 @@ function 读动态参数() {
       v("金叉窗口", 2, 15); v("死叉窗口", 1, 10); v("背离窗口", 15, 60);
       v("金叉加分", 0, 6); v("均线金叉加分", 0, 5); v("底背离加分", 0, 8);
       v("金叉必选", 0, 1);
+      v("强势延续下限", 3, 9.5); v("回调回踩下限", -6, 0); v("回调回踩上限", 0, 3);
       v("常态只数", 3, 8); v("弱市只数", 1, 5); v("冰点只数", 1, 4); v("极弱只数", 1, 3);
     }
   } catch (e) {}
@@ -537,7 +542,12 @@ function scan(cands, ztCodes) {
       fmv = r.f21 ? r.f21 / 1e8 : 0;
     if (price == null || price <= 0) continue;
     if (chg == null || chg <= 0) continue; // 当日红盘
-    if (chg >= CFG.追高上限) continue; // 追高过滤：当日已涨>=上限% 不追（避免次日接盘，上限由复盘自适应）
+    /* 2026-10-16 数据驱动改造：追高过滤从初筛移到 hardFilter 精判。
+       原因：判断「昨日是否涨停」需要日K，初筛只有行情快照拿不到；而数据显示
+       「昨日涨停 + 今日涨幅 ≥5%」是全场唯一可买入的正收益组合（次日 +2.06%、胜率 57%），
+       原初筛把 ≥追高上限 一刀切掉，导致这类票永远无法入选（也解释了 B3/B6 从未触发）。
+       此处只截在涨停线前（封死涨停的票尾盘买不到）。 */
+    if (chg >= 9.8) continue;
     if (vr == null || vr < CFG.量比下限 || vr > CFG.量比上限) continue; // 量比区间（情绪票剔除，区间由复盘自适应）
     if (turn == null || turn < CFG.换手下限 || turn > CFG.换手上限) continue; // 换手区间（情绪票剔除，区间由复盘自适应）
     if (fmv < 20 || fmv > 800) continue; // 流通市值 20-800亿
@@ -662,13 +672,23 @@ function 背离判定(closes, mc, 窗) {
   };
 }
 /* B3 涨停回调形态识别：近10日内曾涨停、其后缩量回调、且不破MA10 */
+/* 涨停回调（B3）——2026-10-16 按 90 交易日回溯修正：
+   昨涨停股按「今日涨跌档」看次日收益：-2~0%（浅回踩）+0.79%/胜率54%、-5~-2% +0.09%、
+   0~2% 0.00%、2~5% -0.68%、<-5%（深回踩）-1.54%。原条件（回调窗口 10 日、不限今日幅度）
+   把深回踩与中继整理全放进来，且成交额/形态叠加后从未触发。现收窄为：
+   回调窗口 ≤2 日 + 今日回踩幅度限定 [回调回踩下限, 回调回踩上限]。 */
 function detect涨停回调(rows, closes, ma10) {
   const n = closes.length;
   if (n < 12 || ma10 == null) return null;
   const last = closes[n - 1];
+  const 昨收 = closes[n - 2];
   if (last < ma10) return null;
+  if (昨收 > 0) {
+    const 今涨 = ((last - 昨收) / 昨收) * 100;
+    if (!(今涨 >= CFG.回调回踩下限 && 今涨 <= CFG.回调回踩上限)) return null;
+  }
   let 涨停序 = -1;
-  for (let i = n - 2; i >= Math.max(1, n - 11); i--) {
+  for (let i = n - 2; i >= Math.max(1, n - 3); i--) {
     const 收 = closes[i],
       昨 = closes[i - 1];
     if (昨 > 0 && (收 - 昨) / 昨 >= 0.098) {
@@ -697,6 +717,24 @@ function detect涨停回调(rows, closes, ma10) {
   if (last < 昨收涨停防线(closes, 涨停序)) return null;
   return { 涨停日: (rows[涨停序] && rows[涨停序].TRADE_DATE) || "", 回调天数: n - 1 - 涨停序, 缩量比: Math.round(缩量比 * 100) };
 }
+/* 强势延续（B6）——2026-10-16 新增，数据驱动：
+   昨日涨停 + 今日涨幅 ∈ [强势延续下限, 9.8%) → 次日 +2.06%、胜率 57%（526 只次，90 交易日）。
+   上限截 9.8% 是因为收盘封死涨停的票尾盘买不到（可买性约束），只取仍在交易区间的。
+   注：与「连板高位」反向——连板是近 5 日 ≥2 次涨停（易炸板），这里只要求昨日 1 次涨停 + 今日续强。 */
+function detect强势延续(rows, closes, code) {
+  const n = closes.length;
+  if (n < 4) return null;
+  const c = String(code || "");
+  const 涨停线 = c.charAt(0) === "3" || c.startsWith("688") ? 19.8 : 9.8;
+  const 今 = closes[n - 1], 昨 = closes[n - 2], 前 = closes[n - 3];
+  if (前 <= 0 || 昨 <= 0) return null;
+  const 昨涨 = ((昨 - 前) / 前) * 100;
+  const 今涨 = ((今 - 昨) / 昨) * 100;
+  if (昨涨 < 涨停线 - 0.2) return null;                      /* 昨日须涨停 */
+  if (今涨 < CFG.强势延续下限 || 今涨 >= 涨停线 - 0.2) return null;  /* 今日续强但未封死 */
+  return { 昨涨: Math.round(昨涨 * 10) / 10, 今涨: Math.round(今涨 * 10) / 10 };
+}
+
 function 昨收涨停防线(closes, 涨停序) {
   if (涨停序 < 1) return 0;
   const 前收 = closes[涨停序 - 1];
@@ -717,7 +755,7 @@ function hardFilter(pool, klineMap) {
   const out = [];
   const 统计 = { 输入: pool.length, 数据不足: 0, 均线不足: 0, 连板剔除: 0, 急涨剔除: 0,
     均线空头: 0, 均线未上行: 0, 死叉剔除: 0, 均线死叉剔除: 0, 顶背离剔除: 0, 形态不符: 0,
-    通过: 0, 金叉票: 0, 均线金叉票: 0, 底背离票: 0 };
+    追高剔除: 0, 通过: 0, 金叉票: 0, 均线金叉票: 0, 底背离票: 0, 强势延续票: 0, 涨停回调票: 0 };
   for (const p of pool) {
     const rows = klineMap[p.code];
     if (!rows || rows.length < 35) { 统计.数据不足++; continue; }
@@ -767,7 +805,11 @@ function hardFilter(pool, klineMap) {
     // MACD 红柱必须处于「加长阶段」：当前红柱 > 前一根红柱（动能增强）；缩短阶段剔除，避免强弩之末
     const 红柱加长 = !!(红柱 && mc.histPrev != null && mc.hist > mc.histPrev);
     const 涨停回调 = detect涨停回调(rows, closes, ma10);
-    if (!((last >= ma5 && 红柱加长) || 涨停回调)) { 统计.形态不符++; continue; }
+    const 强势延续 = detect强势延续(rows, closes, p.code);
+    /* 追高精判（2026-10-16 从初筛移入）：涨幅 ≥ 追高上限 且 非「强势延续」→ 剔除；
+       强势延续票（昨涨停+今续强）豁免，因此类组合实测次日 +2.06%/胜率 57%。 */
+    if (p.chg != null && p.chg >= CFG.追高上限 && !强势延续) { 统计.追高剔除++; continue; }
+    if (!((last >= ma5 && 红柱加长) || 涨停回调 || 强势延续)) { 统计.形态不符++; continue; }
     let redDays = 0;
     if (mc && mc.histArr)
       for (let d = mc.histArr.length - 1; d >= 0; d--) {
@@ -776,9 +818,11 @@ function hardFilter(pool, klineMap) {
       }
     let h20 = 0;
     for (let h = Math.max(0, closes.length - 20); h < closes.length; h++) if (closes[h] > h20) h20 = closes[h];
-    out.push({ p, ma5, ma10, ma30, redDays, h20, 涨停回调, 红柱加长, 近5涨幅: Math.round(近5涨幅 * 10) / 10,
+    out.push({ p, ma5, ma10, ma30, redDays, h20, 涨停回调, 强势延续, 红柱加长, 近5涨幅: Math.round(近5涨幅 * 10) / 10,
       金叉序, 均线金叉序, 底背离: 背离.底背离, 背离 });
     统计.通过++;
+    if (强势延续) 统计.强势延续票++;
+    if (涨停回调) 统计.涨停回调票++;
     if (金叉序 > 0) 统计.金叉票++;
     if (均线金叉序 > 0) 统计.均线金叉票++;
     if (背离.底背离) 统计.底背离票++;
@@ -951,13 +995,15 @@ function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已�
     if (it.涨停回调) score += 3;
     /* 技术形态加分（2026-10-16 用户策略）：金叉启动 / 均线金叉 / 底背离 → 优选加分。
        金叉不设为必要条件——与「红柱加长」叠加会使候选池枯竭；死叉/顶背离已在 hardFilter 硬剔除 */
-    const 技术形态加分 = (it.金叉序 > 0 ? CFG.金叉加分 : 0)
+    const 技术形态加分 = (it.强势延续 ? 3 : 0)
+      + (it.金叉序 > 0 ? CFG.金叉加分 : 0)
       + (it.均线金叉序 > 0 ? CFG.均线金叉加分 : 0)
       + (it.底背离 ? CFG.底背离加分 : 0);
     if (技术形态加分) score += 技术形态加分;
     score = Math.round(Math.min(100, score) * 10) / 10;
     let buyType;
-    if (it.底背离) buyType = "底背离买(B5)";
+    if (it.强势延续) buyType = "强势延续(B6)";
+    else if (it.底背离) buyType = "底背离买(B5)";
     else if (it.金叉序 > 0 && it.金叉序 <= 3) buyType = "金叉买(B4)";
     else if (it.涨停回调) buyType = "涨停回调(B3)";
     else if (p.chg < 5 && p.vr > 1.5) buyType = "突破买(B1)";
