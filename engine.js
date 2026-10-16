@@ -201,6 +201,18 @@ async function getZTPool() {
   return [];
 }
 async function getDTPool() {
+  /* 2026-10-16 口径统一（用户选 H）：改用东财跌停池 tc ——
+     原口径「全市场涨幅 ≤ -9.8%」把创业板/科创板跌 10%（未封死）的票也算成跌停，
+     实测同一时点 23 家 vs 跌停池 8 家，导致引擎定稿温度比看板实时值高约 13 分。
+     统一为「东财跌停池」（真正封死的跌停股）；接口异常时回退原全市场统计。
+     注：仅影响温度的「跌停数」项，个股归因（跌停闷杀）用的仍是个股自身日K数据。 */
+  try {
+    const d = await j(
+      `https://push2ex.eastmoney.com/getTopicDTPool?ut=7eea3edcaed734bea9cbfc24409ed989&dpt=wz.ztzt&Pageindex=0&pagesize=1&sort=fund%3Aasc&date=${today()}`
+    );
+    const tc = d && d.data && d.data.tc;
+    if (typeof tc === "number") return tc;
+  } catch (e) {}
   try {
     const 全部 = await 拉全市场();
     let n = 0;
