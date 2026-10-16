@@ -786,8 +786,13 @@ function hardFilter(pool, klineMap) {
       ? ((closes[closes.length - 1] - closes[closes.length - 6]) / closes[closes.length - 6]) * 100
       : 0;
     if (近5涨幅 >= CFG.急涨上限) { 统计.急涨剔除++; continue; } // 斜率过陡剔除阈值（复盘自适应）
-    if (!(ma5 > ma10 && ma10 > ma30)) { 统计.均线空头++; continue; } // 均线多头
-    if (!(ma5 > ma5p && ma10 > ma10p && ma30 > ma30p)) { 统计.均线未上行++; continue; } // 同步上行
+    /* 2026-10-16 数据驱动豁免：强势延续票不要求均线多头/上行 ——
+       回溯（600 只样本池）显示昨涨停+今续强（5~9.8%）中，均线多头组次日 -0.64%（149 只次），
+       均线非多头组次日 +1.47%/胜率 57%（79 只次）→ 差 -2.11pct。
+       机理：昨涨停+今续强且均线已多头 = 连涨一段（易见顶）；均线未走好的多为底部第一波反弹（空间大）。
+       注意：均线门槛在全样本上仍有微弱正效（+0.09pct），故只对本策略豁免，不做全局放宽。 */
+    if (!(ma5 > ma10 && ma10 > ma30) && !强势延续) { 统计.均线空头++; continue; } // 均线多头（强势延续豁免）
+    if (!(ma5 > ma5p && ma10 > ma10p && ma30 > ma30p) && !强势延续) { 统计.均线未上行++; continue; } // 同步上行（强势延续豁免）
     const last = closes[closes.length - 1];
     const mc = macdSeries(closes);
     /* ── 金叉/死叉/背离（2026-10-16 用户策略：金叉选股、死叉排除、底/顶背离）──
