@@ -153,7 +153,7 @@ function 选股日键() {
 /* ── 数据层 ── */
 async function getIndex() {
   try {
-    const r = await fetch("https://qt.gtimg.cn/q=sh000001,sz399001,sz399006", {
+    const r = await fetch("https://qt.gtimg.cn/q=sh000001,sz399001,sz399006,sh000688", {
       headers: { "User-Agent": UA },
     });
     const buf = Buffer.from(await r.arrayBuffer());
@@ -228,15 +228,10 @@ function mainLines(zt) {
   return out.slice(0, 5);
 }
 function temperature(idxs, zt, dtN, zbN, breadth) {
-  /* 2026-10-16 重构（用户质疑：10-15 三大指数 -1.6~-2.9%、涨 399 跌 4781、跌停 28 家，
-     原算法仍给 44 分「中性偏弱」）。原算法三个缺陷：
-     ① 完全没有涨跌家数维度——普跌日（仅 7.7% 个股上涨）最直观的指标被忽略；
-     ② 涨停数占 30 分、最高连板占 20 分——普跌日涨停是极少数逆势票、连板高度由少数资金抱团，
-        都不能代表市场人气，却合计贡献 40 分；
-     ③ 指数项只取上证且硬顶（shChg<-1 顶 55）在 -1.59% 时未触发，深成指/创业板跌幅完全没计入。
-     新算法满分 100：广度 30 + 涨停 14 + 连板 6 + 跌停 18 + 炸板 10 + **大盘 22**。
-     2026-10-16 二次调整（用户要求「大盘权重拉高一点」）：大盘项 14→22（斜率 8→10），
-     涨停 18→14、连板 8→6、炸板 12→10 让出 8 分——大盘涨跌对温度的影响显著加大。 */
+  /* 权重定版（2026-10-16 用户要求：指数涨跌权重最高、涨跌停家数次之）——
+     指数 40（上证+深证+创业板+科创50 四指数均值）> 涨停 15 + 跌停 15 > 广度 15 > 炸板 10 > 连板 5。
+     演进：原算法（30/20/15/20/15，只看上证）→ 10-16 首次重构（30/14/6/18/10/22 三指数）
+     → 本次按用户要求把指数提到最高（22→40）、加入科创50、涨跌停合计 30 分列第二。 */
   let shChg = 0, 指和 = 0, 指数 = 0;
   for (const x of idxs) {
     const raw = x.f3 || 0;
@@ -250,40 +245,49 @@ function temperature(idxs, zt, dtN, zbN, breadth) {
   for (const x of zt) if (x.lbc > maxLb) maxLb = x.lbc;
   const zbRate = zt.length + zbN > 0 ? (zbN / (zt.length + zbN)) * 100 : 0;
   let s = 0;
-  /* ① 涨跌家数比 30 分（新增，权重最高）：涨家占比 60% 视为满分；数据缺失给中位 15 分不偏袒 */
+  /* ① 指数涨跌 40 分（最高权重）：沪深创科四指数等权均值，每跌 1% 扣 16 分（跌 2.5% 清零） */
+  s += Math.max(0, 40 - Math.max(0, -指均) * 16);
+  /* ② 涨停数 15 分（次高）：45 家满分 */
+  s += Math.min(15, (zt.length / 45) * 15);
+  /* ③ 跌停数 15 分（次高）：每家 -1.0 分，15 家清零 */
+  s += Math.max(0, 15 - dtN * 1.0);
+  /* ④ 涨跌家数（广度）15 分：涨家占比 60% 视为满分；数据缺失给中位 7.5 分不偏袒 */
   if (breadth && breadth.total > 0 && breadth.up != null) {
     const 涨比 = breadth.up / breadth.total;
-    s += Math.max(0, Math.min(30, (涨比 / 0.6) * 30));
+    s += Math.max(0, Math.min(15, (涨比 / 0.6) * 15));
   } else {
-    s += 15;
+    s += 7.5;
   }
-  /* ② 涨停数 14 分（原 30 → 18 → 14：普跌日涨停是极少数逆势票） */
-  s += Math.min(14, (zt.length / 45) * 14);
-  /* ③ 最高连板 6 分（原 20 → 8 → 6：弱市连板不代表人气） */
-  s += Math.min(6, (maxLb / 5) * 6);
-  /* ④ 跌停数 18 分（原 15 分上调：跌停潮是恐慌信号，28 家应清零该项） */
-  s += Math.max(0, 18 - dtN * 1.2);
-  /* ⑤ 炸板率 10 分（原 20 → 12 → 10） */
+  /* ⑤ 炸板率 10 分：>15% 后每 1% 扣 1.2 分 */
   s += Math.max(0, 10 - Math.max(0, zbRate - 15) * 1.2);
-  /* ⑥ 大盘 22 分（2026-10-16 拉高：原 14 分）：三大指数均值，深成指/创业板跌幅同样计入；
-     斜率 10 → 指数均跌 2.2% 该项清零（原 8 → 1.75% 清零） */
-  s += Math.max(0, 22 - Math.max(0, -指均) * 10);
-  if (指均 < -1) s = Math.min(s, 60);
-  if (指均 < -2) s = Math.min(s, 30);
+  /* ⑥ 最高连板 5 分：5 板满分（弱市连板不代表人气，权重最低） */
+  s += Math.min(5, (maxLb / 5) * 5);
+  if (指均 < -1) s = Math.min(s, 55);
+  if (指均 < -2) s = Math.min(s, 28);
+  if (指均 < -3) s = Math.min(s, 12);
   s = Math.max(0, Math.min(100, Math.round(s)));
   const state = s >= 70 ? "强势" : s >= 50 ? "中性偏强" : s >= 35 ? "中性偏弱" : "冰点/退潮";
-  /* 仓位建议（2026-10-16 补）：看板温度卡片读 temperature.pos_advice——
-     此前只在 today.json 顶层提供、对象内没有 → 卡片显示兜底文案「仓位建议待云端补全」（用户实测）。
-     阈值与看板自查口径一致（70/50/35），由温度直接决定，随温度同源。 */
-  const pos_advice = s >= 70 ? "总仓位 60-80%，可适度追强"
-    : s >= 50 ? "总仓位 40-60%，低吸为主不追高"
-    : s >= 35 ? "总仓位 20-40%，只做确定性最高 1-2 只"
-    : "总仓位 ≤10%，降频 1-2 只试探（不空仓），等主线明确再加仓";
-  /* dt_count/zb_count/max_lb（2026-10-16 补）：看板温度卡片读这三个字段，
-     此前云端从未提供 → 跌停/炸板显示「--」（用户截图实测）。与温度构成同源，可追溯。 */
+  const pos_advice =
+    s >= 70 ? "总仓位 60-80%，可适度追强"
+      : s >= 50 ? "总仓位 40-60%，低吸为主不追高"
+      : s >= 35 ? "总仓位 20-40%，只做确定性最高 1-2 只"
+      : "总仓位 ≤10%，降频 1-2 只试探（不空仓），等主线明确再加仓";
+  const 分项 = [
+    { 名: "指数涨跌", 权重: 40, 得分: Math.round(Math.max(0, 40 - Math.max(0, -指均) * 16) * 10) / 10,
+      判据: `沪深创科四指数均值 ${指均 >= 0 ? "+" : ""}${Math.round(指均 * 100) / 100}%（每跌 1% 扣 16 分）` },
+    { 名: "涨停数", 权重: 15, 得分: Math.round(Math.min(15, (zt.length / 45) * 15) * 10) / 10, 判据: `${zt.length} 家（45 家即满分）` },
+    { 名: "跌停数", 权重: 15, 得分: Math.round(Math.max(0, 15 - dtN * 1.0) * 10) / 10, 判据: `${dtN} 家（每家 −1.0 分，15 家清零）` },
+    { 名: "涨跌家数", 权重: 15, 得分: breadth && breadth.total ? Math.round(Math.max(0, Math.min(15, (breadth.up / breadth.total / 0.6) * 15)) * 10) / 10 : 7.5,
+      判据: breadth && breadth.total ? `涨 ${breadth.up}/${breadth.total} 只（涨比 ${Math.round((breadth.up / breadth.total) * 1000) / 10}%，60% 即满分）` : "数据未取到 → 按中位 7.5 分" },
+    { 名: "炸板率", 权重: 10, 得分: Math.round(Math.max(0, 10 - Math.max(0, zbRate - 15) * 1.2) * 10) / 10, 判据: `${Math.round(zbRate * 10) / 10}%（>15% 后每 1% 扣 1.2 分）` },
+    { 名: "最高连板", 权重: 5, 得分: Math.round(Math.min(5, (maxLb / 5) * 5) * 10) / 10, 判据: `${maxLb} 板（5 板即满分）` },
+  ];
+  const 硬顶 = 指均 < -3 ? "已触发：四指数均跌≥3% → 总分封顶 12"
+    : 指均 < -2 ? "已触发：四指数均跌≥2% → 总分封顶 28"
+    : 指均 < -1 ? "已触发：四指数均跌≥1% → 总分封顶 55" : "未触发";
   return { temp: s, zt_count: zt.length, dt_count: dtN, zb_count: zbN, max_lb: maxLb,
-           state: state, pos_advice: pos_advice,
-           shChg: shChg, 指均: Math.round(指均 * 100) / 100,
+           state: state, pos_advice: pos_advice, 分项, 硬顶,
+           shChg: Math.round(shChg * 100) / 100, 指均: Math.round(指均 * 100) / 100,
            广度: breadth && breadth.total ? Math.round((breadth.up / breadth.total) * 1000) / 10 : null };
 }
 
