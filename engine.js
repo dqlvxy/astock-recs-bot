@@ -1017,14 +1017,18 @@ function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已�
     }
     if (yoy != null && yoy < 0) continue; // 基本面过滤：净利同比为负 一票否决（规避业绩下滑/雷股）
     /* ── 三维打分（各 10 分满分）· 细项可追溯 ──
-       权重：技术面 40% + 消息面 40% + 基本面 20%，综合分 = 三者加权 × 10（满分 100） */
+       权重：技术面 45% + 消息面 20% + 基本面 35%（2026-10-16 用户要求调整）。
+       原 40/40/20 中消息面大部分交易日恒为 2 分、无区分度，等于稀释了技术与基本面；
+       现按三维实际区分度重新配比：基本面区分度最高(σ=1.82)→提至 35%，技术保持主导 45%，消息降至 20%。
+       综合分 = 三者加权 × 10（满分 100，权重和恒为 1）。 */
     const n = news[p.name] || 0;
     const sn = (newsMap && newsMap[p.code]) || { n: 0, senti: 0 };
     const 技术 = scoreTechDetail(it, p);
     const 消息 = scoreMsgDetail(sn, n, flashOk);
     const 基本面 = scoreFundDetail(roe, yoy, gm, null);
     const tech = 技术.分, msg = 消息.分, fund = 基本面.分;
-    let score = Math.round((tech * 0.4 + msg * 0.4 + fund * 0.2) * 10 * 10) / 10;
+    /* 三维权重（2026-10-16 调整）：技术 45% / 消息 20% / 基本 35% */
+    let score = Math.round((tech * 0.45 + msg * 0.2 + fund * 0.35) * 10 * 10) / 10;
     const isMain = !!mainSet[p.hybk];
     const 主线加分 = isMain ? 5 : 0;
     if (isMain) score += 5;
@@ -1061,7 +1065,7 @@ function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已�
       scores: { msg, tech, fund },
       scores_detail: {
         tech: 技术.项, msg: 消息.项, fund: 基本面.项,
-        权重: { tech: 40, msg: 40, fund: 20 },
+        权重: { tech: 45, msg: 20, fund: 35 },
         加分: [
           isMain ? { 名称: "主线行业", 得分: 主线加分, 说明: `命中当日主线板块：${p.hybk || ""}` } : null,
           回调加分 ? { 名称: "涨停回调形态", 得分: 回调加分, 说明: "B3 强势回踩，综合分额外加权" } : null,
