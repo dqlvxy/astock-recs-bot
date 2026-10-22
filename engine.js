@@ -239,11 +239,10 @@ function mainLines(zt) {
   out.sort((a, b) => b.net_in - a.net_in);
   return out.slice(0, 5);
 }
-function temperature(idxs, zt, dtN, zbN, breadth) {
-  /* 权重定版（2026-10-16 用户要求：指数涨跌权重最高、涨跌停家数次之）——
-     指数 40（上证+深证+创业板+科创50 四指数均值）> 涨停 15 + 跌停 15 > 广度 15 > 炸板 10 > 连板 5。
-     演进：原算法（30/20/15/20/15，只看上证）→ 10-16 首次重构（30/14/6/18/10/22 三指数）
-     → 本次按用户要求把指数提到最高（22→40）、加入科创50、涨跌停合计 30 分列第二。 */
+function temperature(idxs, zt, dtN, zbN, breadth, 额亿) {
+  /* 权重定版（2026-10-16 用户要求指数最高；2026-10-21 新增量能 10 分，总权重重配 100）——
+     指数 35 > 广度 15 > 涨停 12 + 跌停 12 > 量能 10 > 炸板 13 > 连板 3。
+     量能(沪深总成交) 为 2026-10-21 新增维度（2026-10-22 口径改为沪深两市成交，与看板「涨跌分布」同源），与 CF temp.js 算温度 同款实现。 */
   let shChg = 0, 指和 = 0, 指数 = 0;
   for (const x of idxs) {
     const raw = x.f3 || 0;
@@ -256,30 +255,31 @@ function temperature(idxs, zt, dtN, zbN, breadth) {
   let maxLb = 0;
   for (const x of zt) if (x.lbc > maxLb) maxLb = x.lbc;
   const zbRate = zt.length + zbN > 0 ? (zbN / (zt.length + zbN)) * 100 : 0;
+  const 涨比 = breadth && breadth.total > 0 && breadth.up != null ? breadth.up / breadth.total : null;
   let s = 0;
-  /* ① 指数涨跌 40 分（最高权重）：沪深创科四指数等权均值，**线性双向映射**——
-     +3% 及以上拿满分 40；0% 得中点 20；-3% 及以下清零。斜率 20/3 ≈ 6.67 分每 1%。
-     2026-10-16 用户要求：原规则「只在下跌时扣分」→ 平盘/微跌也拿 38~40 分，40 分权重形同不区分；
-     现要求「涨 3% 才配满分、跌 3% 扣光」，故改为双向线性，涨幅同样需要挣分。 */
-  s += Math.max(0, Math.min(40, 20 + 指均 * (20 / 3)));
-  /* ② 涨停数 15 分（次高）：45 家满分 */
-  s += Math.min(15, (zt.length / 45) * 15);
-  /* ③ 跌停数 15 分（次高）：每家 -1.0 分，15 家清零 */
-  s += Math.max(0, 15 - dtN * 1.0);
-  /* ④ 涨跌家数（广度）15 分：涨家占比 60% 视为满分；数据缺失给中位 7.5 分不偏袒 */
-  if (breadth && breadth.total > 0 && breadth.up != null) {
-    const 涨比 = breadth.up / breadth.total;
-    s += Math.max(0, Math.min(15, (涨比 / 0.6) * 15));
-  } else {
-    s += 7.5;
-  }
-  /* ⑤ 炸板率 10 分：>15% 后每 1% 扣 1.2 分 */
-  s += Math.max(0, 10 - Math.max(0, zbRate - 15) * 1.2);
-  /* ⑥ 最高连板 5 分：5 板满分（弱市连板不代表人气，权重最低） */
-  s += Math.min(5, (maxLb / 5) * 5);
+  /* ① 指数涨跌 35 分（最高权重）：沪深创科四指数等权均值，线性双向映射——+3% 满分 35、0% 得 17.5、−3% 清零 */
+  s += Math.max(0, Math.min(35, 17.5 + 指均 * (17.5 / 3)));
+  /* ② 涨停数 12 分：45 家满分 */
+  s += Math.min(12, (zt.length / 45) * 12);
+  /* ③ 跌停数 12 分：每家 -1.5 分，10 家清零 */
+  s += Math.max(0, 12 - dtN * 1.5);
+  /* ④ 涨跌家数（广度）15 分：以 50% 涨比为中位的对称线性（50% 得 7.5、65% 满分、35% 清零）；缺失给中位 7.5 */
+  s += 涨比 != null ? Math.max(0, Math.min(15, 7.5 + ((涨比 - 0.5) / 0.15) * 7.5)) : 7.5;
+  /* ⑤ 炸板率 13 分：>15% 后每 1% 扣 1.3 分（权重 8→13 补齐总量至 100） */
+  s += Math.max(0, 13 - Math.max(0, zbRate - 15) * 1.3);
+  /* ⑥ 最高连板 3 分：5 板满分 */
+  s += Math.min(3, (maxLb / 5) * 3);
+  /* ⑦ 量能(沪深成交) 10 分（2026-10-21 新增，2026-10-22 口径改为沪深两市总成交）：1 万亿以下 0 分、
+     4 万亿满分 10，中间线性（2026-10-22 用户重定规则；中位 2.5 万亿得 5 分）；缺失给中位 5 分 */
+  s += 额亿 != null ? Math.max(0, Math.min(10, (额亿 - 10000) / 30000 * 10)) : 5;
   if (指均 < -1) s = Math.min(s, 55);
   if (指均 < -2) s = Math.min(s, 28);
   if (指均 < -3) s = Math.min(s, 12);
+  /* 指数-广度背离硬顶（2026-10-21 新增）：指数下跌且个股普跌（涨比<40%）时封顶 45，避免结构性指标虚抬温度 */
+  if (涨比 != null && 指均 < 0) {
+    if (涨比 < 0.40) s = Math.min(s, 45);
+    else if (涨比 < 0.50) s = Math.min(s, 58);
+  }
   s = Math.max(0, Math.min(100, Math.round(s)));
   const state = s >= 70 ? "强势" : s >= 50 ? "中性偏强" : s >= 35 ? "中性偏弱" : "冰点/退潮";
   const pos_advice =
@@ -287,23 +287,29 @@ function temperature(idxs, zt, dtN, zbN, breadth) {
       : s >= 50 ? "总仓位 40-60%，低吸为主不追高"
       : s >= 35 ? "总仓位 20-40%，只做确定性最高 1-2 只"
       : "总仓位 ≤10%，降频 1-2 只试探（不空仓），等主线明确再加仓";
+  const 量能得分 = 额亿 != null ? Math.max(0, Math.min(10, (额亿 - 10000) / 30000 * 10)) : 5;
   const 分项 = [
-    { 名: "指数涨跌", 权重: 40, 得分: Math.round(Math.max(0, Math.min(40, 20 + 指均 * (20 / 3))) * 10) / 10,
-      判据: `沪深创科四指数均值 ${指均 >= 0 ? "+" : ""}${Math.round(指均 * 100) / 100}%（+3% 满分、0% 得 20 分、−3% 清零）` },
-    { 名: "涨停数", 权重: 15, 得分: Math.round(Math.min(15, (zt.length / 45) * 15) * 10) / 10, 判据: `${zt.length} 家（45 家即满分）` },
-    { 名: "跌停数", 权重: 15, 得分: Math.round(Math.max(0, 15 - dtN * 1.0) * 10) / 10, 判据: `${dtN} 家（每家 −1.0 分，15 家清零）` },
-    { 名: "涨跌家数", 权重: 15, 得分: breadth && breadth.total ? Math.round(Math.max(0, Math.min(15, (breadth.up / breadth.total / 0.6) * 15)) * 10) / 10 : 7.5,
-      判据: breadth && breadth.total ? `涨 ${breadth.up}/${breadth.total} 只（涨比 ${Math.round((breadth.up / breadth.total) * 1000) / 10}%，60% 即满分）` : "数据未取到 → 按中位 7.5 分" },
-    { 名: "炸板率", 权重: 10, 得分: Math.round(Math.max(0, 10 - Math.max(0, zbRate - 15) * 1.2) * 10) / 10, 判据: `${Math.round(zbRate * 10) / 10}%（>15% 后每 1% 扣 1.2 分）` },
-    { 名: "最高连板", 权重: 5, 得分: Math.round(Math.min(5, (maxLb / 5) * 5) * 10) / 10, 判据: `${maxLb} 板（5 板即满分）` },
+    { 名: "指数涨跌", 权重: 35, 得分: Math.round(Math.max(0, Math.min(35, 17.5 + 指均 * (17.5 / 3))) * 10) / 10,
+      判据: `沪深创科四指数均值 ${指均 >= 0 ? "+" : ""}${Math.round(指均 * 100) / 100}%（+3% 满分、0% 得 17.5 分、−3% 清零）` },
+    { 名: "涨停数", 权重: 12, 得分: Math.round(Math.min(12, (zt.length / 45) * 12) * 10) / 10, 判据: `${zt.length} 家（45 家即满分）` },
+    { 名: "跌停数", 权重: 12, 得分: Math.round(Math.max(0, 12 - dtN * 1.5) * 10) / 10, 判据: `${dtN} 家（每家 −1.5 分，10 家清零）` },
+    { 名: "涨跌家数", 权重: 15, 得分: 涨比 != null ? Math.round(Math.max(0, Math.min(15, 7.5 + ((涨比 - 0.5) / 0.15) * 7.5)) * 10) / 10 : 7.5,
+      判据: 涨比 != null ? `涨 ${breadth.up}/${breadth.total} 只（涨比 ${Math.round(涨比 * 1000) / 10}%，50% 得中位、35% 清零）` : "数据未取到 → 按中位 7.5 分" },
+    { 名: "炸板率", 权重: 13, 得分: Math.round(Math.max(0, 13 - Math.max(0, zbRate - 15) * 1.3) * 10) / 10, 判据: `${Math.round(zbRate * 10) / 10}%（>15% 后每 1% 扣 1.3 分）` },
+    { 名: "最高连板", 权重: 3, 得分: Math.round(Math.min(3, (maxLb / 5) * 3) * 10) / 10, 判据: `${maxLb} 板（5 板即满分）` },
+    { 名: "量能(沪深成交)", 权重: 10, 得分: Math.round(量能得分 * 10) / 10,
+      判据: 额亿 != null ? `沪深成交 ${额亿} 亿（与看板「涨跌分布」同源；1 万亿以下 0 分、4 万亿满分 10）` : "数据未取到 → 按中位 5 分" },
   ];
   const 硬顶 = 指均 < -3 ? "已触发：四指数均跌≥3% → 总分封顶 12"
     : 指均 < -2 ? "已触发：四指数均跌≥2% → 总分封顶 28"
-    : 指均 < -1 ? "已触发：四指数均跌≥1% → 总分封顶 55" : "未触发";
+    : 指均 < -1 ? "已触发：四指数均跌≥1% → 总分封顶 55"
+    : 涨比 != null && 指均 < 0 && 涨比 < 0.40 ? "已触发：指数下跌且涨比<40% → 总分封顶 45"
+    : 涨比 != null && 指均 < 0 && 涨比 < 0.50 ? "已触发：指数下跌且涨比<50% → 总分封顶 58"
+    : "未触发";
   return { temp: s, zt_count: zt.length, dt_count: dtN, zb_count: zbN, max_lb: maxLb,
            state: state, pos_advice: pos_advice, 分项, 硬顶,
            shChg: Math.round(shChg * 100) / 100, 指均: Math.round(指均 * 100) / 100,
-           广度: breadth && breadth.total ? Math.round((breadth.up / breadth.total) * 1000) / 10 : null };
+           广度: 涨比 != null ? Math.round(涨比 * 1000) / 10 : null, 额亿: 额亿 != null ? 额亿 : null };
 }
 
 /* ── 全市场扫描（腾讯 qt.gtimg，gbk）── */
@@ -1196,7 +1202,15 @@ async function runStable(prog, 已推码集) {
     }
     广度 = { up, down, flat, total: up + down + flat };
   }
-  const temp = temperature(idxs, zt, dtN, zbN, 广度);
+  /* 三市成交(量能维度)：复用 getIndex() 已取的上证(000001)+深证成指(399001) 成交额(万)，
+     求和 ÷1e4 = 亿，与看板「涨跌分布」模块同源同值(14293亿)，零额外请求、不走东财 ulist.np（免限流）。 */
+  let 额亿 = null;
+  {
+    let 沪深万 = 0;
+    for (const x of idxs) if (x.f12 === "000001" || x.f12 === "399001") 沪深万 += (x.成交额万 || 0);
+    if (沪深万 > 0) 额亿 = Math.round(沪深万 / 10000);
+  }
+  const temp = temperature(idxs, zt, dtN, zbN, 广度, 额亿);
   /* 降频不空仓（2026-10-16 用户要求）：低于温度门槛不再空仓，改为压缩推荐只数 */
   const 目标数 = 温度目标只数(temp.temp);
   const 降频中 = temp.temp < CFG.温度下限;
