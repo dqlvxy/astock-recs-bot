@@ -46,7 +46,9 @@ async function 建指数() {
       low: x.f16 || 0,
       chg: x.f4 || 0,
       chg_pct: x.f3 || 0,
-      amount_wan: x.f6 || 0,
+      /* 2026-10-22：getIndex() 为腾讯 qt.gtimg 源，成交额字段名是 成交额万；
+         原先写成东财 f6（腾讯源里不存在）导致 amount_wan 恒为 0 */
+      amount_wan: x.成交额万 || 0,
       turnover: x.f8 || 0,
       vol: x.f5 || 0,
       time: String(x.f124 || ""),
@@ -448,10 +450,18 @@ async function main() {
   const 交易键 = 无横(数据日);
   const lhb = await 建龙虎榜(交易键);
   /* 2026-10-16：温度重构，传入涨跌家数（market_stat 已算好：up/down/flat/total） */
-  const 温 = temperature(index ? Object.entries(index).map(([k, v]) => ({
+  /* 2026-10-22：量能维度透传——上证+深证成交额(万)求和 ÷1e4 = 亿，与 engine.js 主流程、
+     CF temp.js 同源同口径（腾讯 qt.gtimg，与看板「涨跌分布」同值）。getIndex() 为腾讯源，
+     成交额字段名是 成交额万（建指数处 2026-10-22 同步修正，原先写成东财 f6 恒为 0）。 */
+  const 温idxs = index ? Object.entries(index).map(([k, v]) => ({
     f12: k === "sh" ? "000001" : k === "sz" ? "399001" : k === "cyb" ? "399006" : "000688",
     f3: v.chg_pct, f2: v.price, f14: v.name,
-  })) : [], zt, dtN, zbN, market_stat || null);
+    成交额万: v.amount_wan || 0,
+  })) : [];
+  let 沪深成交万 = 0;
+  for (const x of 温idxs) if (x.f12 === "000001" || x.f12 === "399001") 沪深成交万 += (x.成交额万 || 0);
+  const 额亿 = 沪深成交万 > 0 ? Math.round(沪深成交万 / 10000) : null;
+  const 温 = temperature(温idxs, zt, dtN, zbN, market_stat || null, 额亿);
   const 主线 = mainLines(zt);
 
   /* ⑦ 自选关注行情 */
