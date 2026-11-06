@@ -1,7 +1,7 @@
-/* 组合构建 · 确定性单测（第 5 层三维评分 + 基本面一票否决均删除后）
+/* 组合构建 · 确定性单测
    运行：node test/组合构建.test.mjs
    覆盖：① 排序以 S 级（双金共振）优先 ② 形态分为加分项之和 ③ 概率落在 55~88
-        ④ 基本面不再参与选股（无财务数据 / 亏损票照常保留） ⑤ buy_type 双金优先
+        ④ 入池不受非行情数据影响（无财务数据 / 亏损票照常保留） ⑤ buy_type 双金优先
         ⑥ 跨期去重与行业分散 ⑦ 双金单期限量 2 只 */
 import { buildPicks } from "../engine.js";
 
@@ -37,15 +37,16 @@ console.log("一、排序与等级");
   断言("共振明细透传", !!picks[0].共振 && picks[0].共振.K === 42.1, JSON.stringify(picks[0].共振));
 }
 
-console.log("二、形态分 = 加分项之和（无三维加权）");
+console.log("二、形态分 = 加分项之和");
 {
   const hard = [造Hard("600001", "主线+金叉", { 金叉序: 3 })];
   const picks = buildPicks(hard, ["制造业"], {}, 5);
   /* 主线 +5、MACD 金叉 +2 → 7 */
   断言("主线+金叉 = 7 分", picks[0].score === 7, "实际 " + picks[0].score);
-  断言("scores 已置空（三维评分已删）", picks[0].scores === null, JSON.stringify(picks[0].scores));
-  断言("scores_detail 无 tech/msg/fund 明细", !picks[0].scores_detail.tech && !picks[0].scores_detail.msg && !picks[0].scores_detail.fund, Object.keys(picks[0].scores_detail).join(","));
-  断言("reasons.fund 已置空（不再取财务）", picks[0].reasons.fund === "", JSON.stringify(picks[0].reasons.fund));
+  断言("scores 已置空", picks[0].scores === null, JSON.stringify(picks[0].scores));
+  断言("scores_detail 只有「加分」一项", Object.keys(picks[0].scores_detail).join(",") === "加分", Object.keys(picks[0].scores_detail).join(","));
+  断言("reasons 只有「形态」一项", Object.keys(picks[0].reasons).join(",") === "形态", Object.keys(picks[0].reasons).join(","));
+  断言("reasons.形态 为可读理由", typeof picks[0].reasons.形态 === "string" && picks[0].reasons.形态.length > 0);
 }
 
 console.log("三、概率落在 55~88 且随形态分单调");
@@ -57,9 +58,9 @@ console.log("三、概率落在 55~88 且随形态分单调");
   断言("概率不超 88", [a, b].every((x) => x.prob <= 88));
 }
 
-console.log("四、基本面一票否决已删除（财务不参与选股）");
+console.log("四、入池不受非行情数据影响");
 {
-  /* 旧版此处应全部剔除；新版只按技术面+量价选，三只都必须保留 */
+  /* 入池与排序只看量价与形态，三只都必须保留 */
   const 票 = [
     造Hard("600001", "无财务数据"),
     造Hard("600002", "亏损票", { hybk: "软件" }),
