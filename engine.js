@@ -19,6 +19,11 @@ function 读动态参数() {
        昨涨停 + 今涨幅 ≥ 强势延续下限 → 次日 +2.06%、胜率 57%（526 只次）；
        昨涨停 + 今浅回踩(-3%~+0.5%) → 次日 +0.79%、胜率 54%。两者均豁免追高上限。 */
     强势延续下限: 5, 回调回踩下限: -3, 回调回踩上限: 0.5, 强势延续只数: 1,
+    /* 双金共振（B7，2026-11-06 老板要求）：MACD 刚翻红 + KDJ 低位聚合后向上发散
+       → 列为尾盘荐股最高等级（S 级），综合分额外加分、组合构建优先占位。
+       低位阈值 30 = K 值曾进超卖区；聚合阈值 8 = 三线极差收敛到 8 以内视为粘合；
+       发散窗口 5 = 聚合须发生在近 5 日内；刚翻红窗口 3 = 翻红须在近 3 日内（含当日） */
+    KDJ低位阈值: 30, KDJ聚合阈值: 8, KDJ发散窗口: 5, 刚翻红窗口: 3, 双金加分: 6, 双金只数: 2,
     /* 金叉必选 = 1：技术信号票（MACD金叉 / 均线金叉 / 底背离）≥5 只时只从信号票中选股；
        <5 只时自动放宽（全部候选参与、加分仍生效），避免弱势市况选不出票而空仓 */
     金叉必选: 1,
@@ -36,6 +41,8 @@ function 读动态参数() {
       v("金叉窗口", 2, 15); v("死叉窗口", 1, 10); v("背离窗口", 15, 60);
       v("金叉加分", 0, 6); v("均线金叉加分", 0, 5); v("底背离加分", 0, 8);
       v("金叉必选", 0, 1);
+      v("KDJ低位阈值", 15, 45); v("KDJ聚合阈值", 3, 15); v("KDJ发散窗口", 2, 10);
+      v("刚翻红窗口", 1, 5); v("双金加分", 3, 10); v("双金只数", 1, 3);
       v("强势延续下限", 3, 9.5); v("回调回踩下限", -6, 0); v("回调回踩上限", 0, 3);
       v("强势延续只数", 1, 3);
       v("常态只数", 3, 8); v("弱市只数", 1, 5); v("冰点只数", 1, 4); v("极弱只数", 1, 3);
@@ -764,6 +771,100 @@ function detect强势延续(rows, closes, code) {
   return { 昨涨: Math.round(昨涨 * 10) / 10, 今涨: Math.round(今涨 * 10) / 10 };
 }
 
+/* ══ 双金共振（B7，2026-11-06 老板要求）══
+   定义：MACD 刚翻红 + KDJ 指标线由低位聚合后向上发散 → 尾盘荐股最高等级（S 级）。
+   为什么这样拆分：
+   - 「刚翻红」用 hist（=2×(DIF−DEA)）由绿转红判定，等价于 DIF 上穿 DEA，但更能表达「柱状翻红」；
+     额外要求翻红前有 ≥3 根绿柱、翻红后红柱加长，滤掉零轴附近的反复抖动。
+   - 「低位」用近 10 日 K 值最小 ≤ 阈值（默认 30，超卖区）；
+   - 「聚合」用近 5 日三线极差最小值 ≤ 阈值（默认 8，粘合）；
+   - 「向上发散」要求 K>D、K 上行、极差较聚合点扩大 ≥3、J 领涨（J≥K）。
+   KDJ 用标准 9,3,3（RSV 9 日，K/D 各 1/3 平滑，初值 50）。 */
+
+/* KDJ 序列：输入日 K 行（需 HIGH_PRICE / LOW_PRICE / CLOSE_PRICE），返回三线数组与最新值 */
+function kdjSeries(rows) {
+  const n = rows && rows.length;
+  if (!n || n < 12) return null;
+  let K = 50,
+    D = 50;
+  const kArr = [],
+    dArr = [],
+    jArr = [];
+  for (let i = 0; i < n; i++) {
+    let hh = -Infinity,
+      ll = Infinity;
+    for (let j = Math.max(0, i - 8); j <= i; j++) {
+      const hi = rows[j].HIGH_PRICE,
+        lo = rows[j].LOW_PRICE;
+      if (hi > hh) hh = hi;
+      if (lo < ll) ll = lo;
+    }
+    const c = rows[i].CLOSE_PRICE;
+    const rsv = hh === ll ? 50 : ((c - ll) / (hh - ll)) * 100;
+    K = (2 / 3) * K + (1 / 3) * rsv;
+    D = (2 / 3) * D + (1 / 3) * K;
+    kArr.push(K);
+    dArr.push(D);
+    jArr.push(3 * K - 2 * D);
+  }
+  return { kArr, dArr, jArr, K: kArr[n - 1], D: dArr[n - 1], J: jArr[n - 1] };
+}
+
+/* 双金共振判定：命中返回明细对象，否则 null */
+function detect双金共振(mc, kdj) {
+  if (!mc || !mc.histArr || !kdj || !kdj.kArr) return null;
+  const h = mc.histArr,
+    n = h.length;
+  const 窗 = Math.max(1, Math.round(CFG.刚翻红窗口 || 3));
+
+  /* ① MACD 刚翻红：近 窗 日内 hist 由 ≤0 转为 >0 */
+  let 翻红序 = 0;
+  for (let k = 0; k < 窗; k++) {
+    const i = n - 1 - k;
+    if (i < 1) break;
+    if (h[i] > 0 && h[i - 1] <= 0) { 翻红序 = k + 1; break; }
+  }
+  if (!翻红序) return null;
+  if (!(h[n - 1] > 0)) return null;                       /* 当前仍在红柱区 */
+  if (n >= 2 && !(h[n - 1] > h[n - 2])) return null;      /* 红柱加长，动能增强 */
+  let 前绿 = 0;
+  for (let i = n - 1 - 翻红序; i >= 0 && h[i] <= 0; i--) 前绿++;
+  if (前绿 < 3) return null;                              /* 水下翻红，非零轴抖动 */
+
+  /* ② KDJ 低位：近 10 日内 K 曾进入超卖区 */
+  const K = kdj.kArr,
+    D = kdj.dArr,
+    J = kdj.jArr,
+    m = K.length;
+  const 低位窗 = Math.min(m, 10);
+  let 低位值 = 100;
+  for (let i = m - 低位窗; i < m; i++) if (K[i] < 低位值) 低位值 = K[i];
+  if (低位值 > CFG.KDJ低位阈值) return null;
+
+  /* ③ 聚合：近 发散窗口 日内三线极差收敛到阈值以内 */
+  const 聚窗 = Math.min(m, Math.max(2, Math.round(CFG.KDJ发散窗口 || 5)));
+  let 最小间距 = Infinity;
+  for (let i = m - 聚窗; i < m; i++) {
+    const 极差 = Math.max(K[i], D[i], J[i]) - Math.min(K[i], D[i], J[i]);
+    if (极差 < 最小间距) 最小间距 = 极差;
+  }
+  if (最小间距 > CFG.KDJ聚合阈值) return null;
+
+  /* ④ 向上发散：多头排列 + K 上行 + 极差扩大 + J 领涨 */
+  const 当前极差 = Math.max(K[m - 1], D[m - 1], J[m - 1]) - Math.min(K[m - 1], D[m - 1], J[m - 1]);
+  if (!(K[m - 1] > D[m - 1])) return null;
+  if (!(K[m - 1] > K[m - 2])) return null;
+  if (!(当前极差 >= 最小间距 + 3)) return null;
+  if (!(J[m - 1] >= K[m - 1])) return null;
+
+  const r1 = (x) => Math.round(x * 10) / 10;
+  return {
+    翻红序, 前绿,
+    低位值: r1(低位值), 聚合间距: r1(最小间距), 当前间距: r1(当前极差),
+    K: r1(K[m - 1]), D: r1(D[m - 1]), J: r1(J[m - 1]),
+  };
+}
+
 function 昨收涨停防线(closes, 涨停序) {
   if (涨停序 < 1) return 0;
   const 前收 = closes[涨停序 - 1];
@@ -784,7 +885,7 @@ function hardFilter(pool, klineMap) {
   const out = [];
   const 统计 = { 输入: pool.length, 数据不足: 0, 均线不足: 0, 连板剔除: 0, 急涨剔除: 0,
     均线空头: 0, 均线未上行: 0, 死叉剔除: 0, 均线死叉剔除: 0, 顶背离剔除: 0, 形态不符: 0,
-    追高剔除: 0, 量比剔除: 0, 换手剔除: 0, 通过: 0, 金叉票: 0, 均线金叉票: 0, 底背离票: 0, 强势延续票: 0, 涨停回调票: 0 };
+    追高剔除: 0, 量比剔除: 0, 换手剔除: 0, 通过: 0, 金叉票: 0, 均线金叉票: 0, 底背离票: 0, 强势延续票: 0, 涨停回调票: 0, 双金票: 0 };
   for (const p of pool) {
     const rows = klineMap[p.code];
     if (!rows || rows.length < 35) { 统计.数据不足++; continue; }
@@ -797,6 +898,15 @@ function hardFilter(pool, klineMap) {
       ma10p = calcMA(closes.slice(0, -1), 10),
       ma30p = calcMA(closes.slice(0, -1), 30);
     if (ma5 == null || ma10 == null || ma30 == null || ma5p == null) { 统计.均线不足++; continue; }
+    /* MACD / KDJ 提前到均线关卡之前计算：B7 双金票需要据此豁免均线多头（见下） */
+    const mc = macdSeries(closes);
+    const kdj = kdjSeries(rows);
+    const 双金 = detect双金共振(mc, kdj);
+    const 末收 = closes[closes.length - 1];
+    /* B7 均线替代条件：MACD 刚翻红 + KDJ 低位发散本质是「底部第一波启动」，
+       此时均线天然尚未多头排列（要求多头会永远选不出票）。
+       改用「收盘站上 MA5 且 MA5 上翘」作为启动确认，替代原文的多头/上行两关。 */
+    const 双金均线替代 = !!(双金 && ma5 > ma5p && 末收 >= ma5);
     // 接近连板过滤：近5个交易日出现≥2次涨停/接近涨停（按板块涨停线）即视为连板/接近连板，剔除追高接盘
     const 涨停线 = p.code.charAt(0) === "3" || p.code.startsWith("688") ? 0.198 : 0.098;
     let 近5涨停 = 0;
@@ -820,10 +930,9 @@ function hardFilter(pool, klineMap) {
        均线非多头组次日 +1.47%/胜率 57%（79 只次）→ 差 -2.11pct。
        机理：昨涨停+今续强且均线已多头 = 连涨一段（易见顶）；均线未走好的多为底部第一波反弹（空间大）。
        注意：均线门槛在全样本上仍有微弱正效（+0.09pct），故只对本策略豁免，不做全局放宽。 */
-    if (!(ma5 > ma10 && ma10 > ma30) && !强势延续) { 统计.均线空头++; continue; } // 均线多头（强势延续豁免）
-    if (!(ma5 > ma5p && ma10 > ma10p && ma30 > ma30p) && !强势延续) { 统计.均线未上行++; continue; } // 同步上行（强势延续豁免）
+    if (!(ma5 > ma10 && ma10 > ma30) && !强势延续 && !双金均线替代) { 统计.均线空头++; continue; } // 均线多头（强势延续 / B7双金 豁免）
+    if (!(ma5 > ma5p && ma10 > ma10p && ma30 > ma30p) && !强势延续 && !双金均线替代) { 统计.均线未上行++; continue; } // 同步上行（强势延续 / B7双金 豁免）
     const last = closes[closes.length - 1];
-    const mc = macdSeries(closes);
     /* ── 金叉/死叉/背离（2026-10-16 用户策略：金叉选股、死叉排除、底/顶背离）──
        死叉 = 走弱初期（近 CFG.死叉窗口 日 DIF 下穿 DEA）→ 硬剔除；
        均线死叉 = MA5 下穿 MA10 → 硬剔除；
@@ -852,7 +961,7 @@ function hardFilter(pool, klineMap) {
       if (p.vr == null || p.vr < CFG.量比下限 || p.vr > CFG.量比上限) { 统计.量比剔除++; continue; }
       if (p.turn == null || p.turn < CFG.换手下限 || p.turn > CFG.换手上限) { 统计.换手剔除++; continue; }
     }
-    if (!((last >= ma5 && 红柱加长) || 涨停回调 || 强势延续)) { 统计.形态不符++; continue; }
+    if (!((last >= ma5 && 红柱加长) || 涨停回调 || 强势延续 || 双金)) { 统计.形态不符++; continue; }
     let redDays = 0;
     if (mc && mc.histArr)
       for (let d = mc.histArr.length - 1; d >= 0; d--) {
@@ -862,8 +971,11 @@ function hardFilter(pool, klineMap) {
     let h20 = 0;
     for (let h = Math.max(0, closes.length - 20); h < closes.length; h++) if (closes[h] > h20) h20 = closes[h];
     out.push({ p, ma5, ma10, ma30, redDays, h20, 涨停回调, 强势延续, 红柱加长, 近5涨幅: Math.round(近5涨幅 * 10) / 10,
-      金叉序, 均线金叉序, 底背离: 背离.底背离, 背离 });
+      金叉序, 均线金叉序, 底背离: 背离.底背离, 背离, 双金, kdj, 双金均线替代,
+      /* 双金票的买点优先级最高，硬过滤通过即视为最高等级候选 */
+      等级: 双金 ? "S" : "A" });
     统计.通过++;
+    if (双金) 统计.双金票++;
     if (强势延续) 统计.强势延续票++;
     if (涨停回调) 统计.涨停回调票++;
     if (金叉序 > 0) 统计.金叉票++;
@@ -942,60 +1054,13 @@ async function batchFin(hard) {
   );
   return map;
 }
-/* ── 三维细项打分（各 10 分满分）· 供 UI 点开显示逐条理由 ── */
-function scoreTechDetail(it, p) {
-  const 项 = [];
-  const 均线分 = it.maOk ? 4 : it.redDays > 0 ? 2 : 0;
-  项.push({ 名称: "均线多头排列", 得分: 均线分, 满分: 4, 说明: it.maOk ? "MA5>MA10>MA20>MA30，多头格局确立" : "均线尚未完全多头，形态偏弱" });
-  const 红盘分 = Math.min(3, Math.round((it.redDays / 45) * 3 * 10) / 10);
-  项.push({ 名称: "连续红盘", 得分: 红盘分, 满分: 3, 说明: `近 45 日内红盘 ${it.redDays} 天（越长越强）` });
-  const vr = p.vr || 0;
-  const 量比分 = Math.round(Math.min(3, Math.max(0, (vr - 1) * 1.5)) * 10) / 10;
-  项.push({ 名称: "量能比", 得分: 量比分, 满分: 3, 说明: `量比 ${Math.round(vr * 10) / 10}（1~3 倍为健康放量）` });
-  if (it.涨停回调) 项.push({ 名称: "涨停回调形态", 得分: 0, 满分: 0, 加分: 0, 说明: `${it.涨停回调.回调天数} 日内涨停，缩量 ${it.涨停回调.缩量比}%（强势回踩，综合分额外 +3）` });
-  /* 技术形态信号（2026-10-16 新增）：展示用，加分在 buildPicks 里计入综合分（100 分制） */
-  if (it.底背离) 项.push({ 名称: "底背离", 得分: 0, 满分: 0, 加分: 0, 说明: `价创新低而 MACD 抬高（${it.背离 && it.背离.低差 != null ? "低点差 " + it.背离.低差 + "%" : "下跌动能衰竭"}，综合分额外 +${CFG.底背离加分}）` });
-  if (it.金叉序 > 0) 项.push({ 名称: "MACD金叉启动", 得分: 0, 满分: 0, 加分: 0, 说明: `${it.金叉序} 日前 DIF 上穿 DEA（综合分额外 +${CFG.金叉加分}）` });
-  if (it.均线金叉序 > 0) 项.push({ 名称: "均线金叉", 得分: 0, 满分: 0, 加分: 0, 说明: `${it.均线金叉序} 日前 MA5 上穿 MA10（综合分额外 +${CFG.均线金叉加分}）` });
-  const 总 = 项.reduce((a, b) => a + (b.满分 ? b.得分 : 0), 0);
-  return { 分: Math.min(10, Math.round(总 * 10) / 10), 项 };
-}
-function scoreMsgDetail(sn, flashN, flashOk) {
-  const 项 = [];
-  const 热度分 = Math.min(3, Math.round((sn.n || 0) * 0.6 * 10) / 10);
-  项.push({ 名称: "新闻热度", 得分: 热度分, 满分: 3, 说明: `近 30 天相关新闻 ${sn.n || 0} 条${(sn.n || 0) === 0 ? "（无个股新闻）" : ""}` });
-  const senti = sn.senti || 0;
-  const 情感分 = Math.min(4, Math.max(0, Math.round((senti + 3) * 0.6667 * 10) / 10));
-  项.push({ 名称: "情感倾向", 得分: 情感分, 满分: 4, 说明: `正向词 - 负向词 = ${senti > 0 ? "+" : ""}${senti}（利好词与利空词相抵后的净倾向）` });
-  const 快讯分 = Math.min(3, Math.round((flashN || 0) * 0.6 * 10) / 10);
-  项.push({ 名称: "快讯提及", 得分: 快讯分, 满分: 3, 说明: flashN > 0 ? `7×24 快讯提及 ${flashN} 次` : flashOk ? "快讯未提及" : "快讯数据缺失，按基准分" });
-  const 总 = 项.reduce((a, b) => a + b.得分, 0);
-  return { 分: Math.min(10, Math.round(总 * 10) / 10), 项 };
-}
-function scoreFundDetail(roe, yoy, gm, pe) {
-  const 项 = [];
-  const roe分 = Math.round(Math.min(4, Math.max(0, ((roe || 0) / 10) * 4)) * 10) / 10;
-  项.push({ 名称: "ROE 净资产收益率", 得分: roe分, 满分: 4, 说明: `ROE ${roe == null ? "--" : Math.round(roe * 10) / 10 + "%"}（10% 以上为优）` });
-  const 同比分 = Math.round(Math.min(3, Math.max(0, ((yoy == null ? 0 : yoy) / 150) * 3)) * 10) / 10;
-  项.push({ 名称: "净利润同比", 得分: 同比分, 满分: 3, 说明: yoy == null ? "无同比数据" : `净利同比 ${Math.round(yoy * 10) / 10}%（增速越快越高）` });
-  const 毛利分 = Math.round(Math.min(2, Math.max(0, ((gm || 0) / 50) * 2)) * 10) / 10;
-  项.push({ 名称: "销售毛利率", 得分: 毛利分, 满分: 2, 说明: gm == null ? "无毛利率数据" : `毛利率 ${Math.round(gm * 10) / 10}%` });
-  const 估值分 = pe != null && pe > 0 && pe < 100 ? 1 : 0;
-  项.push({ 名称: "估值合理性", 得分: 估值分, 满分: 1, 说明: pe == null ? "市盈率数据缺失" : `PE ${Math.round(pe * 10) / 10}${估值分 ? "（<100，估值合理）" : "（偏高）"}` });
-  const 总 = 项.reduce((a, b) => a + b.得分, 0);
-  return { 分: Math.min(10, Math.round(总 * 10) / 10), 项 };
-}
-function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已推码集, 目标数) {
+/* ── 组合构建（2026-11-06：删除第 5 层三维评分）──
+   排序依据改为：等级（S = 双金共振最高等级优先）+ 形态加分之和。
+   基本面「一票否决」作为风控门槛保留（无财务数据 / 亏损 / 净利同比为负 → 剔除），但不参与打分。 */
+function buildPicks(hard, finMap, mainNames, 已推码集, 目标数) {
   const N = Math.max(1, 目标数 || 5);   // 推荐只数（温度分档决定，降频不空仓）
   const mainSet = {};
   for (const m of mainNames) mainSet[m] = 1;
-  const news = {};
-  for (const t of flashTitles || []) {
-    for (const h of hard) {
-      const nm = h.p.name;
-      if (t.indexOf(nm) >= 0) news[nm] = (news[nm] || 0) + 1;
-    }
-  }
   let picks = [];
   for (const it of hard) {
     const p = it.p;
@@ -1022,19 +1087,10 @@ function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已�
       }
     }
     if (yoy != null && yoy < 0) continue; // 基本面过滤：净利同比为负 一票否决（规避业绩下滑/雷股）
-    /* ── 三维打分（各 10 分满分）· 细项可追溯 ──
-       权重：技术面 45% + 消息面 20% + 基本面 35%（2026-10-16 用户要求调整）。
-       原 40/40/20 中消息面大部分交易日恒为 2 分、无区分度，等于稀释了技术与基本面；
-       现按三维实际区分度重新配比：基本面区分度最高(σ=1.82)→提至 35%，技术保持主导 45%，消息降至 20%。
-       综合分 = 三者加权 × 10（满分 100，权重和恒为 1）。 */
-    const n = news[p.name] || 0;
-    const sn = (newsMap && newsMap[p.code]) || { n: 0, senti: 0 };
-    const 技术 = scoreTechDetail(it, p);
-    const 消息 = scoreMsgDetail(sn, n, flashOk);
-    const 基本面 = scoreFundDetail(roe, yoy, gm, null);
-    const tech = 技术.分, msg = 消息.分, fund = 基本面.分;
-    /* 三维权重（2026-10-16 调整）：技术 45% / 消息 20% / 基本 35% */
-    let score = Math.round((tech * 0.45 + msg * 0.2 + fund * 0.35) * 10 * 10) / 10;
+    /* ── 形态分（2026-11-06 老板要求删除第 5 层：三维评分不再存在）──
+       排序依据 = 等级（S 级双金共振优先）+ 形态加分之和；
+       加分：主线 +5、涨停回调 +3、强势延续 +3、MACD 金叉 +2、均线金叉 +1、底背离 +4、双金共振 +6。 */
+    let score = 0;
     const isMain = !!mainSet[p.hybk];
     const 主线加分 = isMain ? 5 : 0;
     if (isMain) score += 5;
@@ -1045,11 +1101,14 @@ function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已�
     const 技术形态加分 = (it.强势延续 ? 3 : 0)
       + (it.金叉序 > 0 ? CFG.金叉加分 : 0)
       + (it.均线金叉序 > 0 ? CFG.均线金叉加分 : 0)
-      + (it.底背离 ? CFG.底背离加分 : 0);
+      + (it.底背离 ? CFG.底背离加分 : 0)
+      + (it.双金 ? CFG.双金加分 : 0);   /* B7 双金共振：最高等级额外加权 */
     if (技术形态加分) score += 技术形态加分;
     score = Math.round(Math.min(100, score) * 10) / 10;
     let buyType;
-    if (it.强势延续) buyType = "强势延续(B6)";
+    /* B7 双金共振优先于一切买点：MACD 刚翻红 + KDJ 低位聚合后向上发散 = 最高等级 */
+    if (it.双金) buyType = "双金共振(B7)";
+    else if (it.强势延续) buyType = "强势延续(B6)";
     else if (it.底背离) buyType = "底背离买(B5)";
     else if (it.金叉序 > 0 && it.金叉序 <= 3) buyType = "金叉买(B4)";
     else if (it.涨停回调) buyType = "涨停回调(B3)";
@@ -1057,7 +1116,9 @@ function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已�
     else buyType = "回踩买(B2)";
     const buyPrice = buyType === "突破买(B1)" ? Math.round(it.h20 * 1.005 * 100) / 100 : Math.round(it.ma10 * 1.005 * 100) / 100;
     let stop = Math.round(buyPrice * CFG.止损率 * 100) / 100; // 统一止损（止损率由复盘自适应，默认 -8%）
-    const prob = Math.round(Math.min(92, Math.max(20, score + Math.min(8, (p.vr - 1) * 2) + Math.min(6, it.redDays * 0.8))) * 10) / 10;
+    /* 概率：三维评分删除后不再由加权分推算；按形态分线性映射并钳制 55~88。
+       它只是相对强弱参考，不代表真实胜率。 */
+    const prob = Math.round(Math.min(88, Math.max(55, 55 + score * 1.1)) * 10) / 10;
     picks.push({
       code: p.code,
       name: p.name,
@@ -1068,15 +1129,20 @@ function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已�
       score,
       prob,
       概率: prob,
-      scores: { msg, tech, fund },
+      scores: null,
       scores_detail: {
-        tech: 技术.项, msg: 消息.项, fund: 基本面.项,
-        权重: { tech: 45, msg: 20, fund: 35 },
+        /* 三维明细（技术/消息/基本面）随第 5 层一并删除，仅保留形态加分项 */
         加分: [
           isMain ? { 名称: "主线行业", 得分: 主线加分, 说明: `命中当日主线板块：${p.hybk || ""}` } : null,
           回调加分 ? { 名称: "涨停回调形态", 得分: 回调加分, 说明: "B3 强势回踩，综合分额外加权" } : null,
+          it.双金 ? { 名称: "双金共振（最高等级）", 得分: CFG.双金加分,
+            说明: `MACD ${it.双金.翻红序} 日前翻红（前有 ${it.双金.前绿} 根绿柱）· KDJ 低位 ${it.双金.低位值} 聚合至 ${it.双金.聚合间距} 后发散至 ${it.双金.当前间距}（K ${it.双金.K} / D ${it.双金.D} / J ${it.双金.J}）` } : null,
         ].filter(Boolean),
       },
+      tier: it.双金 ? "S" : "A",
+      tier_name: it.双金 ? "最高等级" : "常规",
+      最高等级: !!it.双金,
+      共振: it.双金 || null,
       buy_type: buyType,
       buy_price: buyPrice,
       买入价: buyPrice,
@@ -1094,11 +1160,13 @@ function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已�
       reasons: {
         tech: "MA多头·MACD" + (it.红柱加长 ? "红柱加长" : (it.redDays > 0 ? "红柱缩短" : "无红柱")) + (it.redDays > 0 ? "·红" + it.redDays + "天" : "") + "·量比" + Math.min(99, Math.round(p.vr * 10) / 10) + "·换手" + Math.round(p.turn * 10) / 10 + "%" + (it.涨停回调 ? "·涨停回调(" + it.涨停回调.回调天数 + "日内涨停,缩量" + it.涨停回调.缩量比 + "%)" : ""),
         fund: "ROE " + Math.round(roe * 10) / 10 + "% · 净利同比 " + (yoy == null ? "-" : Math.round(yoy * 10) / 10 + "%"),
-        msg: sn.n > 0 ? "近30天新闻 " + sn.n + " 条 · 情感净分 " + (sn.senti > 0 ? "+" : "") + sn.senti : flashOk ? "快讯提及 " + n + " 次 · 无个股新闻" : "无近期新闻，按基准分",
+        msg: "形态加分 " + score + " 分" + (it.双金 ? " · 双金共振（最高等级）" : "") + (isMain ? " · 主线" + (p.hybk || "") : ""),
       },
     });
   }
-  picks.sort((a, b) => b.score - a.score);
+  /* 排序：最高等级（S 级双金共振）优先，同级再按综合分降序 */
+  const 级序 = (x) => (x.tier === "S" ? 1 : 0);
+  picks.sort((a, b) => 级序(b) - 级序(a) || b.score - a.score);
   /* ── 去重（稳健版）──
      ① 同日去重：同一只票只保留一次
      ② 跨期去重：排除「最近 3 期」已推荐过的票（由调用方经 已推码集 传入） */
@@ -1117,9 +1185,21 @@ function buildPicks(hard, finMap, flashTitles, mainNames, flashOk, newsMap, 已�
     top = [];
   /* 强势延续票限量（2026-10-16）：这类票（昨涨停+今续强、多数均线未走好）波动更大，
      单期最多纳入 CFG.强势延续只数（默认 1），避免风险敞口过度集中。 */
-  let 强势延续已选 = 0;
-  const 可加 = (it) => !(it.强势延续 && 强势延续已选 >= (CFG.强势延续只数 || 1));
-  const 记入 = (it) => { if (it.强势延续) 强势延续已选++; };
+  /* 限量规则（2026-11-06 修正）：
+     ① 双金共振（S 级）单期最多 CFG.双金只数（默认 2）只，最高等级也要控制风险敞口；
+     ② 强势延续单期最多 CFG.强势延续只数（默认 1）只；
+     ③ 同时满足两者时按双金计，不占强势延续名额（双金优先）。
+     注：原实现用 it.强势延续 判断，但 pick 对象上没有该字段（只有 buy_type），
+     导致强势延续限量长期空转、从未生效；此处改为按 buy_type 判定，恢复设计意图。 */
+  let 强势延续已选 = 0,
+    双金已选 = 0;
+  const 是双金 = (x) => x.tier === "S";
+  const 是强势 = (x) => !是双金(x) && /强势延续/.test(x.buy_type || "");
+  const 可加 = (it) => {
+    if (是双金(it)) return 双金已选 < (CFG.双金只数 || 2);
+    return !(是强势(it) && 强势延续已选 >= (CFG.强势延续只数 || 1));
+  };
+  const 记入 = (it) => { if (是双金(it)) 双金已选++; else if (是强势(it)) 强势延续已选++; };
   for (const it2 of picks) {
     if (top.length >= N) break;
     if (!可加(it2)) continue;
@@ -1247,12 +1327,11 @@ async function runStable(prog, 已推码集) {
   if (!hard.length) return 空仓("硬条件无通过标的（市场环境弱）");
 
   P(78, "拉取财务与个股新闻（ROE/消息面）…");
-  const B = await Promise.all([batchFin(hard), batchNews(hard), getFlash()]);
-  const fmap = B[0],
-    newsMap = B[1],
-    flash = B[2];
+  /* 2026-11-06：第 5 层删除后消息面不再参与打分，随之停掉新闻 / 快讯两块并发请求，
+     财务数据仅用于「基本面一票否决」 */
+  const fmap = await batchFin(hard);
   P(90, "三维打分中（消息面按个股新闻）…");
-  const picks = buildPicks(hard, fmap, flash || [], mainNames, flash !== null, newsMap, 已推码集, 目标数);
+  const picks = buildPicks(hard, fmap, mainNames, 已推码集, 目标数);
   if (目标数 < CFG.常态只数) P(88, "降频模式：本期限推 " + 目标数 + " 只（温度 " + temp.temp + " 分）");
   P(96, "三维打分完成 · 综合排序");
   if (!picks.length) return 空仓("财务过滤后无推荐（亏损或数据缺失）");
@@ -1284,14 +1363,13 @@ export {
   hardFilter,
   buildPicks,
   macdSeries,
+  kdjSeries,
+  detect双金共振,
   detect涨停回调,
   getFin,
   getFlash,
   mainLines,
   temperature,
-  scoreTechDetail,
-  scoreMsgDetail,
-  scoreFundDetail,
   /* ── 供 today.js（全模块云端快照）复用 ── */
   getIndex,
   getZTPool,
