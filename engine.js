@@ -1,5 +1,6 @@
 // engine.js —— 稳健版选股引擎（Node 移植版）
-// 移植自 A股选股看板.html 的 FS.run（稳健版：技术40%+消息40%+基本面20%）+ 共享数据层 FS工具。
+// 移植自 A股选股看板.html 的 FS.run，已演化为「五层漏斗 + 形态分排序」稳健版；
+// 原三维评分（技术40%+消息40%+基本面20%）与基本面条件已于 2026-11-06 整层删除。
 // 纯计算 + 公开行情接口；去除了所有 window/DOM 依赖；gbk 解码用 iconv-lite。
 // 输出结构对齐前端「拉后端存档 / 合并十日荐股」契约：{ date, gen_time, picks, temperature, main_lines }
 import iconv from "iconv-lite";
@@ -501,66 +502,6 @@ async function 批行业(候选) {
   return map;
 }
 
-/* ── 新闻情感（东财 search-api JSONP → Node 走文本解析）── */
-const SENTI_POS = ["涨停","上涨","大涨","增长","大增","超预期","中标","签约","利好","回购","增持","扭亏","盈利","创新高","突破","大单","预增","翻倍","放量","新高","分红","扩产","获批","合作","订单","提升","改善","创收","净增","看好","强于","跑赢","上修","领涨","走强","活跃","景气","提速","加码"];
-const SENTI_NEG = ["下跌","下滑","大跌","亏损","减持","质押","处罚","违规","立案","退市","预警","利空","商誉","减值","暴跌","跌停","下调","低于预期","诉讼","冻结","终止","问询","监管","套现","被查","风险","承压","降级","退潮","炸板","净流出","流出","回落","走弱","失守","中止","取消"];
-const SENTI_TRAP = ["利好出尽","不及预期","假涨停","涨停打开","涨停回落","涨停跳水","涨停炸板","高位放量","放量下跌","放量滞涨","上涨乏力","冲高跳水","断板","天地板","核按钮"];
-function analyzeSentiment(titles) {
-  let pos = 0,
-    neg = 0;
-  for (const t of titles) {
-    let tt = t;
-    for (const trap of SENTI_TRAP) while (tt.indexOf(trap) >= 0) {
-      neg++;
-      tt = tt.replace(trap, "□");
-    }
-    for (const w of SENTI_POS) if (tt.indexOf(w) >= 0) pos++;
-    for (const w of SENTI_NEG) if (tt.indexOf(w) >= 0) neg++;
-  }
-  let net = pos - neg;
-  if (net > 3) net = 3;
-  if (net < -3) net = -3;
-  return net;
-}
-async function getStockNews(code) {
-  const param = {
-    uid: "",
-    keyword: code,
-    type: ["cmsArticleWebOld"],
-    client: "web",
-    clientType: "web",
-    clientVersion: "curr",
-    param: { cmsArticleWebOld: { searchScope: "default", sort: "time", pageIndex: 1, pageSize: 10, preTag: "", postTag: "" } },
-  };
-  const url =
-    "https://search-api-web.eastmoney.com/search/jsonp?cb=scb&param=" +
-    encodeURIComponent(JSON.stringify(param));
-  try {
-    const txt = await jt(url);
-    const titles = [];
-    const s2 = String(txt);
-    const i1 = s2.indexOf("("),
-      i2 = s2.lastIndexOf(")");
-    if (i1 >= 0 && i2 > i1) {
-      const d = JSON.parse(s2.slice(i1 + 1, i2));
-      const arr = (d.result && d.result.cmsArticleWebOld) || [];
-      for (const x of arr) if (x.title) titles.push(String(x.title).replace(/<[^>]+>/g, ""));
-    }
-    return titles;
-  } catch (e) {
-    return [];
-  }
-}
-async function batchNews(hard) {
-  const map = {};
-  await workers(4, hard.slice(), (it) =>
-    getStockNews(it.p.code).then((titles) => {
-      map[it.p.code] = { n: titles.length, senti: analyzeSentiment(titles) };
-    })
-  );
-  return map;
-}
-
 /* ── 稳健版漏斗（移植自 FS.run）── */
 function scan(cands, ztCodes) {
   const out = [];
@@ -996,22 +937,6 @@ async function getZBPool() {
     return {};
   }
 }
-/* 新浪快讯（Node 走普通 JSON，无 JSONP/DOM）；失败返回 null → 关闭快讯加权 */
-async function getFlash() {
-  try {
-    const txt = await jt("https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&num=80&page=1");
-    const s = String(txt);
-    const i1 = s.indexOf("("),
-      i2 = s.lastIndexOf(")");
-    const data = i1 >= 0 && i2 > i1 ? JSON.parse(s.slice(i1 + 1, i2)) : JSON.parse(s);
-    const arr = (data.result && data.result.data) || [];
-    const t = [];
-    for (const x of arr) if (x.title) t.push(String(x.title));
-    return t;
-  } catch (e) {
-    return null;
-  }
-}
 /* ── 组合构建（2026-11-06：删除第 5 层三维评分）──
    排序依据改为：等级（S = 双金共振最高等级优先）+ 形态加分之和。
    2026-11-06 二次变更（老板要求）：基本面「一票否决」也已删除——
@@ -1162,13 +1087,13 @@ const TL = {
   temperature,
   mainLines,
   batchKlines,
-  batchNews,
   批行业,
   workers,
 };
 
 /* ── 主流程 runStable（对齐前端 拉后端存档 / 合并十日荐股 契约）──
-   稳健版：技术面40% + 消息面40% + 基本面20%；尾盘买入，持股 1–4 周。
+   稳健版：五层漏斗（温度定仓 → 初筛 → 硬过滤 12 关 → 技术信号优选 → 形态分构建）；
+   尾盘买入，持股 1–4 周。三维评分（技术/消息/基本面）已于 2026-11-06 整层删除。
    动态参数：硬门槛（量比区间/换手区间/温度下限/连板阈值/急涨上限/止损率）由 review.js
    每日收盘复盘后写入 params.json 自适应调整，均带硬上下限钳制；params.json 缺失时用默认值。
    急涨上限：近5个交易日累计涨幅≥此值视为近似90度竖直拉升，剔除（默认30%，用户要求）。
@@ -1262,8 +1187,8 @@ async function runStable(prog, 已推码集) {
   } catch (e) {}
   if (!hard.length) return 空仓("硬条件无通过标的（市场环境弱）");
 
-  /* 2026-11-06：第 5 层三维评分与基本面一票否决均已删除 →
-     财务 / 个股新闻 / 快讯三块外部请求全部下线，硬过滤后直接排形态分选股。 */
+  /* 2026-11-06：第 5 层三维评分与基本面一票否决均已删除，
+     财务 / 个股新闻 / 快讯三块外部请求连同其代码一并移除，硬过滤后直接排形态分选股。 */
   P(88, "形态加分结算中（等级 + 加分项）…");
   const picks = buildPicks(hard, mainNames, 已推码集, 目标数);
   if (目标数 < CFG.常态只数) P(88, "降频模式：本期限推 " + 目标数 + " 只（温度 " + temp.temp + " 分）");
@@ -1300,7 +1225,6 @@ export {
   kdjSeries,
   detect双金共振,
   detect涨停回调,
-  getFlash,
   mainLines,
   temperature,
   /* ── 供 today.js（全模块云端快照）复用 ── */
