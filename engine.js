@@ -985,29 +985,6 @@ function hardFilter(pool, klineMap) {
   过滤统计.本次 = 统计;
   return out;
 }
-function scoreFund(roe, yoy, gm, pe) {
-  let s = 0;
-  s += Math.min(4, (Math.max(0, roe) / 10) * 4);
-  s += Math.min(3, (Math.max(0, yoy) / 150) * 3);
-  s += Math.min(2, (Math.max(0, gm) / 50) * 2);
-  s += pe != null && pe < 100 ? 1 : 0;
-  return Math.round(s * 10) / 10;
-}
-async function getFin(codes) {
-  const c = codes.map((x) => '"' + x + '"').join(",");
-  try {
-    const d = await j(
-      "https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_F10_FINANCE_MAINFINADATA&columns=SECURITY_CODE,REPORT_DATE,ROEJQ,PARENTNETPROFIT,XSMLL&filter=(SECURITY_CODE+in+(" +
-        encodeURIComponent(c) +
-        "))&pageNumber=1&pageSize=" +
-        codes.length * 6 +
-        "&sortColumns=REPORT_DATE&sortTypes=-1"
-    );
-    return (d.result && d.result.data) || [];
-  } catch (e) {
-    return [];
-  }
-}
 async function getZBPool() {
   try {
     const d = await j(
@@ -1038,55 +1015,17 @@ async function getFlash() {
     return null;
   }
 }
-async function batchFin(hard) {
-  const codes = hard.map((x) => x.p.code);
-  const map = {},
-    tasks = [];
-  for (let j = 0; j < codes.length; j += 30) tasks.push(codes.slice(j, j + 30));
-  await workers(3, tasks, (batch) =>
-    getFin(batch).then((rows) => {
-      for (const r of rows) {
-        const c = r.SECURITY_CODE;
-        if (!map[c]) map[c] = [];
-        map[c].push(r);
-      }
-    })
-  );
-  return map;
-}
 /* ── 组合构建（2026-11-06：删除第 5 层三维评分）──
    排序依据改为：等级（S = 双金共振最高等级优先）+ 形态加分之和。
-   基本面「一票否决」作为风控门槛保留（无财务数据 / 亏损 / 净利同比为负 → 剔除），但不参与打分。 */
-function buildPicks(hard, finMap, mainNames, 已推码集, 目标数) {
+   2026-11-06 二次变更（老板要求）：基本面「一票否决」也已删除——
+   财务数据本身不再参与选股判定，硬过滤全部由技术面 + 量价条件承担。 */
+function buildPicks(hard, mainNames, 已推码集, 目标数) {
   const N = Math.max(1, 目标数 || 5);   // 推荐只数（温度分档决定，降频不空仓）
   const mainSet = {};
   for (const m of mainNames) mainSet[m] = 1;
   let picks = [];
   for (const it of hard) {
     const p = it.p;
-    const finRows = finMap[p.code] || [];
-    if (!finRows.length) continue;
-    finRows.sort((a, b) => (a.REPORT_DATE < b.REPORT_DATE ? 1 : -1));
-    const cur = finRows[0];
-    const roe = cur.ROEJQ,
-      np = cur.PARENTNETPROFIT,
-      gm = cur.XSMLL;
-    if (roe == null || np == null) continue;
-    if (roe < 0 || np < 0) continue; // 排除亏损
-    let yoy = null;
-    for (let m = 1; m < finRows.length; m++) {
-      const pr = finRows[m];
-      const yr = (cur.REPORT_DATE || "").slice(0, 4),
-        mr = (cur.REPORT_DATE || "").slice(5, 7);
-      const yr2 = (pr.REPORT_DATE || "").slice(0, 4),
-        mr2 = (pr.REPORT_DATE || "").slice(5, 7);
-      if (mr === mr2 && parseInt(yr, 10) - parseInt(yr2, 10) === 1) {
-        const b = pr.PARENTNETPROFIT;
-        yoy = b ? ((np - b) / Math.abs(b)) * 100 : null;
-        break;
-      }
-    }
-    if (yoy != null && yoy < 0) continue; // 基本面过滤：净利同比为负 一票否决（规避业绩下滑/雷股）
     /* ── 形态分（2026-11-06 老板要求删除第 5 层：三维评分不再存在）──
        排序依据 = 等级（S 级双金共振优先）+ 形态加分之和；
        加分：主线 +5、涨停回调 +3、强势延续 +3、MACD 金叉 +2、均线金叉 +1、底背离 +4、双金共振 +6。 */
@@ -1159,7 +1098,7 @@ function buildPicks(hard, finMap, mainNames, 已推码集, 目标数) {
       vol_ratio: Math.round(p.vr * 100) / 100,
       reasons: {
         tech: "MA多头·MACD" + (it.红柱加长 ? "红柱加长" : (it.redDays > 0 ? "红柱缩短" : "无红柱")) + (it.redDays > 0 ? "·红" + it.redDays + "天" : "") + "·量比" + Math.min(99, Math.round(p.vr * 10) / 10) + "·换手" + Math.round(p.turn * 10) / 10 + "%" + (it.涨停回调 ? "·涨停回调(" + it.涨停回调.回调天数 + "日内涨停,缩量" + it.涨停回调.缩量比 + "%)" : ""),
-        fund: "ROE " + Math.round(roe * 10) / 10 + "% · 净利同比 " + (yoy == null ? "-" : Math.round(yoy * 10) / 10 + "%"),
+        fund: "",  /* 2026-11-06：基本面一票否决删除后不再取财务数据，此字段留空以兼容旧看板读取 */
         msg: "形态加分 " + score + " 分" + (it.双金 ? " · 双金共振（最高等级）" : "") + (isMain ? " · 主线" + (p.hybk || "") : ""),
       },
     });
@@ -1326,15 +1265,13 @@ async function runStable(prog, 已推码集) {
   } catch (e) {}
   if (!hard.length) return 空仓("硬条件无通过标的（市场环境弱）");
 
-  P(78, "拉取财务与个股新闻（ROE/消息面）…");
-  /* 2026-11-06：第 5 层删除后消息面不再参与打分，随之停掉新闻 / 快讯两块并发请求，
-     财务数据仅用于「基本面一票否决」 */
-  const fmap = await batchFin(hard);
-  P(90, "三维打分中（消息面按个股新闻）…");
-  const picks = buildPicks(hard, fmap, mainNames, 已推码集, 目标数);
+  /* 2026-11-06：第 5 层三维评分与基本面一票否决均已删除 →
+     财务 / 个股新闻 / 快讯三块外部请求全部下线，硬过滤后直接排形态分选股。 */
+  P(88, "形态加分结算中（等级 + 加分项）…");
+  const picks = buildPicks(hard, mainNames, 已推码集, 目标数);
   if (目标数 < CFG.常态只数) P(88, "降频模式：本期限推 " + 目标数 + " 只（温度 " + temp.temp + " 分）");
-  P(96, "三维打分完成 · 综合排序");
-  if (!picks.length) return 空仓("财务过滤后无推荐（亏损或数据缺失）");
+  P(96, "形态分排序完成");
+  if (!picks.length) return 空仓("去重与分散后无标的（候选不足或行业过于集中）");
   const elapsed = Math.round((Date.now() - t0) / 100) / 10;
   P(100, "完成，共 " + picks.length + " 只");
   return {
@@ -1348,7 +1285,7 @@ async function runStable(prog, 已推码集) {
     main_lines: main,
     picks,
     mode: "stable",
-    note: "稳健版引擎 · 技术40%+消息40%+基本面20% · 尾盘买入持股1-4周",
+    note: "稳健版引擎 · 五层漏斗（温度→初筛→硬过滤→技术信号优选→形态分构建）· 尾盘买入持股1-4周",
   };
 }
 
@@ -1366,7 +1303,6 @@ export {
   kdjSeries,
   detect双金共振,
   detect涨停回调,
-  getFin,
   getFlash,
   mainLines,
   temperature,
