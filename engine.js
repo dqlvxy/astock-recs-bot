@@ -437,27 +437,36 @@ async function 拉全市场() {
 }
 
 /* ── 日K / 批量 ── */
+/* 2026-11-06 事故：腾讯把 /appstock/app/fqkline/get 整条路径挂上 WAF
+   （HTTP 501 + 跳 waf.tencent.com/501page.html）。j() 拿到 HTML → r.json() 抛错 →
+   日K 恒空 → hardFilter「不足 35 根」全剔除 → 每日荐股必空仓，且日志只显示
+   「无候选」，根因被掩盖。改用同域新版 /appstock/app/newfqkline/get，
+   并保留老域名不复权日K 作为降级（仅除权日有跳空，好过整条链路空转）。 */
 async function 取日K(代码) {
   const 全码 = /^[a-z]{2}/.test(代码) ? 代码 : 代码.charAt(0) === "6" ? "sh" + 代码 : "sz" + 代码;
-  const 址 =
-    "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/fqkline/get?param=" +
-    全码 +
-    ",day,,,80,qfq";
-  try {
-    const d = await j(址);
-    const 节点 = d && d.data && d.data[全码];
-    const 行集 = (节点 && (节点.qfqday || 节点.day)) || [];
-    return 行集.map((r) => ({
-      TRADE_DATE: r[0],
-      OPEN_PRICE: parseFloat(r[1]),
-      CLOSE_PRICE: parseFloat(r[2]),
-      HIGH_PRICE: parseFloat(r[3]),
-      LOW_PRICE: parseFloat(r[4]),
-      VOLUME: parseFloat(r[5]),
-    }));
-  } catch (e) {
-    return [];
+  const 址表 = [
+    "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/newfqkline/get?param=" + 全码 + ",day,,,80,qfq",
+    "https://web.ifzq.gtimg.cn/appstock/app/kline/kline?param=" + 全码 + ",day,,,80",
+  ];
+  for (const 址 of 址表) {
+    try {
+      const d = await j(址);
+      const 节点 = d && d.data && d.data[全码];
+      const 行集 = (节点 && (节点.qfqday || 节点.day)) || [];
+      if (!行集.length) continue;
+      return 行集.map((r) => ({
+        TRADE_DATE: r[0],
+        OPEN_PRICE: parseFloat(r[1]),
+        CLOSE_PRICE: parseFloat(r[2]),
+        HIGH_PRICE: parseFloat(r[3]),
+        LOW_PRICE: parseFloat(r[4]),
+        VOLUME: parseFloat(r[5]),
+      }));
+    } catch (e) {
+      /* 换下一个源 */
+    }
   }
+  return [];
 }
 async function batchKlines(cands) {
   const map = {};
