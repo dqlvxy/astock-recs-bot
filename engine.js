@@ -575,10 +575,11 @@ function scan(cands, ztCodes) {
       vr = r.f9,
       fmv = r.f21 ? r.f21 / 1e8 : 0;
     if (price == null || price <= 0) continue;
-    if (chg == null || chg <= 0) continue; // 当日红盘
+    if (chg == null) continue; // 涨幅数据缺失（仅防御，不设方向门槛）
     /* 涨幅只作「可买性」约束：≥ 涨停线剔除（封死涨停的票尾盘买不到）。
-       追高上限（当日涨幅硬门槛）已于 2026-11-06 按老板要求删除，
-       因此不再按涨幅分层过滤，选股只看技术面、量价与均线形态。 */
+       「当日必须红盘」（涨幅 > 0）已于 2026-11-06 按老板要求删除；
+       追高上限（涨幅硬上限）亦已于同日删除。
+       现在当日红绿盘不影响入池，选股只看技术面、量价与均线形态。 */
     if (chg >= 9.8) continue;
     /* 2026-10-16：量比/换手同追高一样从初筛移到 hardFilter 精判 ——
        强势延续票（昨涨停+今续强）天然高量比高换手，被初筛区间挡在门外
@@ -1239,8 +1240,8 @@ async function runStable(prog, 已推码集) {
   P(18, "温度 " + temp.temp + " 分 · 涨停 " + temp.zt_count + " 家 · 涨 " + (广度 ? 广度.up : "—") + "/跌 " + (广度 ? 广度.down : "—") + " · 主线 " + mainNames.length + " 个");
   const ztCodes = zt.map((x) => String(x.c));
   const cands = scan(all, ztCodes);
-  P(40, "初筛候选 " + cands.length + " 只（红盘/量比/换手/市值/可买）");
-  if (!cands.length) return 空仓("无候选股票（红盘/量比/换手/市值均不符或全为涨停）");
+  P(40, "初筛候选 " + cands.length + " 只（量比/换手/市值/可买）");
+  if (!cands.length) return 空仓("无候选股票（量比/换手/市值均不符或全为涨停）");
 
   P(46, "拉取日线计算均线/MACD（" + cands.length + " 只）…");
   const kmap = await batchKlines(cands);
