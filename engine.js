@@ -1192,7 +1192,7 @@ async function runStable(prog, 已推码集) {
   } catch (e) {}
   if (!hard.length) return 空仓("硬条件无通过标的（市场环境弱）");
 
-  /* 硬过滤后直接按形态分构建组合；选股阶段不请求财务、新闻、快讯等非行情数据。 */
+  /* 硬过滤后直接按形态分构建组合；选股阶段只使用行情与量价数据。 */
   P(88, "形态加分结算中（等级 + 加分项）…");
   const picks = buildPicks(hard, mainNames, 已推码集, 目标数);
   if (目标数 < CFG.常态只数) P(88, "降频模式：本期限推 " + 目标数 + " 只（温度 " + temp.temp + " 分）");
