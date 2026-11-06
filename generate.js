@@ -114,8 +114,9 @@ function 精简期(g) {
       is_main: x.is_main, mode: x.mode,
       pct: x.pct, pct_chg: x.pct_chg,          /* 荐股日当日涨跌幅：供看板「今日柱子」在无次日数据时兜底 */
       turnover: x.turnover, vol_ratio: x.vol_ratio,
-      /* 三维评分与逐项明细：看板消息面/技术面/基本面三格与「打分理由」弹层的数据源，
-         曾因本白名单漏传导致前端三项恒显 0/10（2026-10-14 修复） */
+      /* 评分与明细透传：2026-11-06 起 scores 恒为 null（三维加权已删除），
+         scores_detail 只剩「加分」一项（形态加分拆解）；仍必须透传，否则看板「推荐依据」
+         弹窗里的加分项会全空。历史期数据带的是三维明细，看板按有无 scores 自动区分展示。 */
       scores: x.scores || null,
       scores_detail: x.scores_detail || null,
       /* 近5日累计涨幅：复盘脚本急涨失败率归因的判据（chg5），漏传则归因永远为空 */
