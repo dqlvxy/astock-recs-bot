@@ -107,16 +107,15 @@ function 精简期(g) {
     picks: (g.picks || []).map((x) => ({
       code: x.code, name: x.name, prob: x.prob, score: x.score,
       buy_price: x.buy_price, stop_loss: x.stop_loss, industry: x.industry,
-      buy_type: x.buy_type, reasons: x.reasons, tech: x.tech,
+      buy_type: x.buy_type, reasons: x.reasons,
       /* 荐股等级（2026-11-06）：S=双金共振最高等级（MACD 刚翻红 + KDJ 低位聚合后发散）。
          漏传会导致看板拿不到等级、最高等级徽章不显示 */
       tier: x.tier || "A", tier_name: x.tier_name || "常规", 共振: x.共振 || null,
       is_main: x.is_main, mode: x.mode,
       pct: x.pct, pct_chg: x.pct_chg,          /* 荐股日当日涨跌幅：供看板「今日柱子」在无次日数据时兜底 */
       turnover: x.turnover, vol_ratio: x.vol_ratio,
-      /* 评分与明细透传：2026-11-06 起 scores 恒为 null（三维加权已删除），
-         scores_detail 只剩「加分」一项（形态加分拆解）；仍必须透传，否则看板「推荐依据」
-         弹窗里的加分项会全空。历史期数据带的是三维明细，看板按有无 scores 自动区分展示。 */
+      /* 评分与明细透传：scores 恒为 null（已无加权评分），scores_detail 只剩「加分」一项
+         （形态加分拆解）；仍必须透传，否则看板「推荐依据」弹窗里的加分项会全空。 */
       scores: x.scores || null,
       scores_detail: x.scores_detail || null,
       /* 近5日累计涨幅：复盘脚本急涨失败率归因的判据（chg5），漏传则归因永远为空 */
