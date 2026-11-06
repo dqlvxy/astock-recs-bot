@@ -2,14 +2,12 @@
 //  1) 读 recs.json 全部历史荐股
 //  2) 对「推荐日之后第一个交易日」已发生的期，拉个股日K，算「次日收盘」相对「推荐日收盘」涨跌
 //  3) 归因失败票（2026-10-16 重锚持股日：用户在荐股日 14:50 买入，荐股日波动不计入盈亏）：
-//     持股日归因共十五因子（数量不固定、可继续扩展；因子名统一 4 字），全部解释持股日盈亏——
+//     持股日归因共十三因子（数量不固定、可继续扩展；因子名统一 4 字），全部解释持股日盈亏——
 //     市场类 5：弱市 / 板块 / 独跌 / 闷杀（跳空≤-5%贴地）/ 放量（量≥1.5倍）；
 //     形态类 4：低开（隔夜冲击，跳空≤-3%）/ 回落（盘中最高涨≥1% 而收跌≥2%）/
 //               缩量（量≤0.8倍且跌）/ 破位（荐股日在 MA5 上方、持股日下穿 MA5）；
 //     高位类 4：追高（荐日涨幅≥4%→持股日回吐）/ 情绪（量比>5或换手>20→持股日退潮）/
 //               连板（荐日前5日≥2次涨停→持股日炸板）/ 急涨（荐日前5日累计≥30%→持股日急跌）；
-//     消息类 2：利空（强利空词命中，附标题证据）/ 异动（交易所关注，高位风险）——
-//               窗口 [荐股日 15:00, 持股日 15:00]、来源东财公告+新闻搜索，接口失败降级不影响其他因子
 //  4) 统计滚动成功率 + 失败模式
 //  5) 输出 review_log.json（逐期明细）+ review.md（人类可读复盘报告）
 //  6) 生成 params.json 的 cfg（滚动成功率低→温和收紧阈值，含硬上下限），供 engine.js 次日读取自适应
@@ -154,7 +152,7 @@ function 板块名(sec) {
 
 // 持股日解剖（全部锚定持股日 = 荐股日下一交易日，用户在荐股日 14:50 收盘价买入）：
 //   个股涨跌/跳空/贴地/量倍 用已拉的个股K；板块涨跌 拉所属板块指数日K（进程内缓存）；
-//   超额 = 个股 - 板块：≤-1pct 判「个股独跌」（利空/资金出逃等个股自身因素）。
+//   超额 = 个股 - 板块：≤-1pct 判「个股独跌」（个股自身因素，如资金出逃）。
 function 持股日解剖(code, kl, recDate, 大盘日K) {
   if (!kl || !kl.length) return null;
   let i0 = -1;
@@ -230,58 +228,6 @@ function 持股日解剖(code, kl, recDate, 大盘日K) {
   };
 }
 
-// ===== 消息面归因（2026-10-16 扩展）=====
-// 数据源（东财）：公告接口按股票查、含精确发布时间；新闻搜索按代码查（云端可访问，看板公告接口 CORS 亦允许）。
-// 窗口 = [荐股日 15:00, 持股日 15:00]——荐股日盘后消息影响持股日，持股日收盘后消息不影响本次结算。
-// 判定：异动（交易所关注，高位风险）/ 利空（强利空词命中且不含避坑词，附标题证据）。
-// 降级：接口失败或超时 → 返回空证据，不影响其他因子，不抛错。
-const 强利空词 = ["立案", "被调查", "退市", "终止上市", "暂停上市", "预亏", "业绩下滑", "大幅下降", "同比下降",
-  "债务违约", "逾期", "冻结", "划扣", "处罚", "警示函", "监管函", "问询函", "关注函", "诉讼", "仲裁",
-  "失信", "被执行", "停产", "失联", "辞职", "离职", "商誉减值", "大额减值", "清仓式减持", "违规",
-  "爆仓", "强制平仓", "风险警示", "无法表示意见", "保留意见", "终止合作", "解除合同", "大幅降价"];
-const 避坑词 = ["解除质押", "解押", "解除冻结", "增持", "回购", "中标", "获批", "预增", "扭亏", "增长",
-  "减持计划期限届满", "未减持", "不减持", "终止减持", "提前终止", "解除限售", "恢复正常"];
-
-async function 拉公告(code) {
-  const url = `https://np-anotice-stock.eastmoney.com/api/security/ann?sr=-1&page_size=30&page_index=1` +
-    `&ann_type=A&client_source=web&stock_list=${code}&f_node=0&s_node=0`;
-  try {
-    const d = await j(url);
-    return (((d.data || {}).list) || []).map((it) => ({
-      日期: String(it.display_time || it.notice_date || "").slice(0, 16),
-      类型: "公告", 标题: String(it.title || ""),
-    }));
-  } catch (e) { return []; }
-}
-async function 拉新闻(code) {
-  const param = JSON.stringify({
-    uid: "", keyword: String(code), type: ["cmsArticleWebOld"], client: "web",
-    clientType: "web", clientVersion: "curr",
-    param: { cmsArticleWebOld: { searchScope: "default", sort: "time", pageIndex: 1, pageSize: 20 } },
-  });
-  const url = "https://search-api-web.eastmoney.com/search/jsonp?cb=x&param=" + encodeURIComponent(param);
-  try {
-    const raw = await fetch(url, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(15000) }).then((r) => r.text());
-    const d = JSON.parse(raw.slice(raw.indexOf("(") + 1, raw.lastIndexOf(")")));
-    return ((((d.result || {}).cmsArticleWebOld) || [])).map((it) => ({
-      日期: String(it.date || "").slice(0, 16), 类型: "新闻",
-      标题: String(it.title || "").replace(/<\/?em>/g, ""),
-    }));
-  } catch (e) { return []; }
-}
-async function 消息面(code, 荐股日, 持股日) {
-  const 起 = 荐股日 + " 15:00", 止 = 持股日 + " 15:00";
-  const 全 = [...(await 拉公告(code)), ...(await 拉新闻(code))];
-  const 证据 = [];
-  for (const m of 全) {
-    if (!(m.日期 >= 起 && m.日期 <= 止)) continue;
-    if (m.标题.indexOf("异常波动") >= 0) { 证据.push({ ...m, 标签: "异动" }); continue; }
-    const 险 = 强利空词.filter((w) => m.标题.indexOf(w) >= 0 && !避坑词.some((b) => m.标题.indexOf(b) >= 0));
-    if (险.length) 证据.push({ ...m, 标签: "利空" });
-  }
-  return { 证据, 利空: 证据.some((e) => e.标签 === "利空"), 异动: 证据.some((e) => e.标签 === "异动") };
-}
-
 // 默认参数 + 硬上下限保护
 function 默认参数() {
   return {
@@ -292,7 +238,6 @@ function 默认参数() {
       弱市失败率: null, 板块失败率: null, 独跌失败率: null, 闷杀失败率: null, 放量失败率: null,
       低开失败率: null, 回落失败率: null, 缩量失败率: null, 破位失败率: null,
       追高失败率: null, 情绪失败率: null, 连板失败率: null, 急涨失败率: null,
-      利空失败率: null, 异动失败率: null,
       平均失败跌幅: null },
   };
 }
@@ -317,13 +262,11 @@ function 算优化参数(items) {
   const 独跌失败率 = 失败.length ? 失败.filter((p) => p.超额 != null && p.超额 <= -1).length / 失败.length : null;
   const 闷杀失败率 = 失败.length ? 失败.filter((p) => p.闷杀).length / 失败.length : null;
   const 放量失败率 = 失败.length ? 失败.filter((p) => p.放量).length / 失败.length : null;
-  /* 形态类 3 + 消息类 2（2026-10-16 扩展） */
+  /* 形态类 4（2026-10-16 扩展） */
   const 低开失败率 = 失败.length ? 失败.filter((p) => p.低开).length / 失败.length : null;
   const 破位失败率 = 失败.length ? 失败.filter((p) => p.破位).length / 失败.length : null;
   const 回落失败率 = 失败.length ? 失败.filter((p) => p.回落).length / 失败.length : null;
   const 缩量失败率 = 失败.length ? 失败.filter((p) => p.缩量).length / 失败.length : null;
-  const 利空失败率 = 失败.length ? 失败.filter((p) => p.利空).length / 失败.length : null;
-  const 异动失败率 = 失败.length ? 失败.filter((p) => p.异动).length / 失败.length : null;
   const 追高失败率 = 失败.length ? 失败.filter((p) => p.chg != null && p.chg >= 4).length / 失败.length : null;
   const 情绪失败率 = 失败.length ? 失败.filter((p) => p.vr > 5 || p.turn > 20).length / 失败.length : null;
   const 平均失败跌幅 = 失败.length ? Math.round((失败.reduce((s, p) => s + p.ret, 0) / 失败.length) * 10) / 10 : null;
@@ -357,7 +300,6 @@ function 算优化参数(items) {
     弱市失败率, 板块失败率, 独跌失败率, 闷杀失败率, 放量失败率,
     低开失败率, 回落失败率, 缩量失败率, 破位失败率,
     追高失败率, 情绪失败率, 连板失败率, 急涨失败率,
-    利空失败率, 异动失败率,
     平均失败跌幅 };
   参数.updated = new Date().toLocaleString("sv-SE").replace("T", " ");
   return 参数;
@@ -426,14 +368,6 @@ async function 主流程() {
         ...(持股日解剖(p.code, kl, g.date, 大盘日K) || {}),
       };
       if (ret != null && ret > 0) 涨++;
-      /* 消息面（利空/异动）只对跌票拉取，省请求；接口失败降级为空，不影响其他因子 */
-      if (r.ret != null && r.ret < 0 && 持股日) {
-        const 荐日带横 = String(g.date).replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3");
-        try {
-          const m = await 消息面(p.code, 荐日带横, 持股日);
-          r.证据 = m.证据; r.利空 = m.利空; r.异动 = m.异动;
-        } catch (e) { r.证据 = []; r.利空 = false; r.异动 = false; }
-      }
       期.picks.push(r);
     }
     期.success = 期.picks.filter((p) => p.ret != null).length ? 涨 : null;
@@ -469,12 +403,11 @@ async function 主流程() {
   md += 线("> 由 review.js 在每日收盘后自动生成（北京时间 15:30），验证上期荐股「次日收盘」表现并归因失败。");
   md += 线(">");
   md += 线("> **归因口径（2026-10-16 重锚）**：用户在荐股日 14:50 收盘价买入，盈亏只与持股日（荐股日下一交易日）有关——");
-  md += 线("> 失败归因共十五因子（数量不固定、可继续扩展；**因子名统一 4 字**，全部解释持股日盈亏）：");
-  md += 线("> **市场类 5** —— 弱市 / 板块（所属指数跌≥1%）/ 独跌（个股弱于板块≥1pct，利空或资金出逃）/ 闷杀（跳空≤-5% 且收在最低）/ 放量（量能≥1.5倍）；");
+  md += 线("> 失败归因共十三因子（数量不固定、可继续扩展；**因子名统一 4 字**，全部解释持股日盈亏）：");
+  md += 线("> **市场类 5** —— 弱市 / 板块（所属指数跌≥1%）/ 独跌（个股弱于板块≥1pct，个股自身因素）/ 闷杀（跳空≤-5% 且收在最低）/ 放量（量能≥1.5倍）；");
   md += 线("> **形态类 4** —— 低开（隔夜冲击，跳空≤-3%）/ 回落（盘中最高涨≥1% 而收跌≥2%）/ 缩量（量能≤前5日均量0.8倍且收跌）/ 破位（荐股日在 MA5 上方、持股日下穿 MA5）；");
   md += 线("> **高位类 4** —— 追高（荐日涨幅≥4%→持股日回吐）/ 情绪（量比>5或换手>20→持股日退潮）/ 连板（荐日前5日≥2次涨停→持股日炸板）/ 急涨（荐日前5日累计≥30%→持股日急跌）；");
   md += 线("> 兜底分级（判据全部未命中时仍给出原因）：跑输（跌幅大于所属指数）/ 承压（隔夜低开未收复）/ 回调（温和调整中的正常波动）");
-  md += 线("> **消息类 2** —— 利空（强利空词命中，附标题证据）/ 异动（交易所关注，高位风险），窗口 [荐股日 15:00, 持股日 15:00]，来源东财公告+新闻搜索。");
   md += 线("");
   md += 线("## 滚动统计（近 N 期已到次日）");
   const st = 参数.stats;
@@ -484,15 +417,13 @@ async function 主流程() {
   md += 线(`- 情绪失败率（量比>5/换手>20 过热后失败）：${st.情绪失败率 == null ? "—" : (Math.round(st.情绪失败率 * 100) + "%")}`);
   md += 线(`- 弱市失败率（持股日上证下跌）：${st.弱市失败率 == null ? "—" : (Math.round(st.弱市失败率 * 100) + "%")}`);
   md += 线(`- 板块失败率（持股日所属板块指数跌≥1%）：${st.板块失败率 == null ? "—" : (Math.round(st.板块失败率 * 100) + "%")}`);
-  md += 线(`- 独跌失败率（持股日个股弱于板块≥1pct，利空/资金出逃）：${st.独跌失败率 == null ? "—" : (Math.round(st.独跌失败率 * 100) + "%")}`);
+  md += 线(`- 独跌失败率（持股日个股弱于板块≥1pct）：${st.独跌失败率 == null ? "—" : (Math.round(st.独跌失败率 * 100) + "%")}`);
   md += 线(`- 闷杀失败率（持股日跳空≤-5% 且收在最低附近）：${st.闷杀失败率 == null ? "—" : (Math.round(st.闷杀失败率 * 100) + "%")}`);
   md += 线(`- 放量失败率（持股日量能≥前5日均量1.5倍）：${st.放量失败率 == null ? "—" : (Math.round(st.放量失败率 * 100) + "%")}`);
   md += 线(`- 低开失败率（持股日跳空≤-3%）：${st.低开失败率 == null ? "—" : (Math.round(st.低开失败率 * 100) + "%")}`);
   md += 线(`- 回落失败率（盘中最高涨≥1% 而收跌≥2%）：${st.回落失败率 == null ? "—" : (Math.round(st.回落失败率 * 100) + "%")}`);
   md += 线(`- 缩量失败率（量能≤0.8倍且收跌）：${st.缩量失败率 == null ? "—" : (Math.round(st.缩量失败率 * 100) + "%")}`);
   md += 线(`- 破位失败率（荐股日在 MA5 上方、持股日跌破 MA5）：${st.破位失败率 == null ? "—" : (Math.round(st.破位失败率 * 100) + "%")}`);
-  md += 线(`- 利空失败率（窗口内强利空公告/新闻）：${st.利空失败率 == null ? "—" : (Math.round(st.利空失败率 * 100) + "%")}`);
-  md += 线(`- 异动失败率（窗口内股票交易异常波动公告）：${st.异动失败率 == null ? "—" : (Math.round(st.异动失败率 * 100) + "%")}`);
   md += 线(`- 连板失败率（荐日前5日≥2次涨停后失败）：${st.连板失败率 == null ? "—" : (Math.round(st.连板失败率 * 100) + "%")}`);
   md += 线(`- 急涨失败率（近5日涨幅≥30% 后失败）：${st.急涨失败率 == null ? "—" : (Math.round(st.急涨失败率 * 100) + "%")}`);
   md += 线(`- 平均失败跌幅：**${st.平均失败跌幅 == null ? "—" : st.平均失败跌幅 + "%"}**`);
@@ -530,8 +461,6 @@ async function 主流程() {
         if ((p.vr != null && p.vr > 5) || (p.turn != null && p.turn > 20)) 因.push("情绪");
         if (p.near_limit_up != null && p.near_limit_up >= 2) 因.push("连板");
         if (p.chg5 != null && p.chg5 >= 30) 因.push("急涨");
-        if (p.利空) 因.push("利空");
-        if (p.异动) 因.push("异动");
         /* 兜底分级（2026-10-16 用户要求：跌股必须给出具体原因，不再输出「未命中/其他」）：
            跑输（跌幅大于所属指数）→ 承压（隔夜低开未收复）→ 回调（温和调整中的正常波动） */
         if (!因.length) {
@@ -542,7 +471,6 @@ async function 主流程() {
         return "｜持股日归因：" + 因.join("+");
       })() : "";
       md += 线(`   - ${p.name}(${p.code}) 次日收盘 ${涨跌}${持股日因}｜推荐日涨幅 ${p.chg == null ? "—" : p.chg + "%"}｜量比 ${p.vr ?? "—"}｜换手 ${p.turn ?? "—"}%`);
-      if (p.证据 && p.证据.length) for (const e of p.证据) md += 线(`     · [${e.标签}] ${e.日期} ${e.类型}：${e.标题}`);
     }
   }
   writeFileSync(报告文件, md, "utf-8");
