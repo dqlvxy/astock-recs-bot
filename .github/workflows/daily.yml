@@ -1,26 +1,23 @@
 name: 每日稳健版荐股 + 全模块快照
 
-# 北京时间 14:05 = UTC 06:05，周一~周五
+# 北京时间 14:05 / 14:15 / 14:25 / 14:35 / 14:45（UTC 06:05/06:15/06:25/06:35/06:45），周一~周五
 #   —— 老板流程：14:30 荐股定稿 → 14:50 尾盘买入 → 次日涨了卖。
-#   故 cron 提前到 14:15 触发，给 GitHub 免费版 cron 的 5~20 分钟延迟留缓冲，
-#   保证定稿在 14:50 买入前一定落到云端（14:05 触发，留 25 分钟延迟缓冲）（原先 14:30 触发，实测曾延迟到 15:12 才出，
-#   用户 14:50 买入时云端还没有今日荐股，只能看本地引擎预演，导致两版不一致）。
-#   定稿一经生成即冻结：当日已有存档则 generate.js 跳过重算，不覆盖；
-#   需强制重算时用 workflow_dispatch 并勾选 force。
+#   5 档 = 自带重试。GitHub 免费版 cron 延迟完全不可控，实测：
+#     11-03~05 延迟 40~75 分钟；11-06 延迟到当晚 22:03；11-09 三次触发全部被丢弃（0 次运行）。
+#   配合下方「今日定稿闸门」：第一个成功触发点生成定稿，后续触发点整套秒退，绝不重复推荐。
+#   最坏 14:45 触发 + 3 分钟跑完 = 14:48 落地，仍赶在 14:50 买入前。
+#   定稿一经生成即冻结：当日已有存档则 generate.js 跳过重算，不覆盖。
+#
+#   ⚠ 本工作流没有任何手动触发入口（2026-11-09 老板要求删除，连同 force 覆盖参数一并清理）。
+#     唯一来源就是上面 5 个 cron。若某天全部触发点都被 GitHub 丢弃，当天不会有荐股 ——
+#     这是「不要手动按钮」的必然代价，已知并接受。
 on:
   schedule:
-    # 三个触发点 = 自带重试（GitHub 免费版 cron 延迟不可控，实测曾从 14:30 拖到 15:12）：
-    #   14:05 主跑 → 14:20 兜底 → 14:35 再兜底（配合下方「今日定稿闸门」，已有定稿则整套秒退，绝不重复推荐）
-    #   最坏 14:35 触发 + 3 分钟跑完 = 14:38 落地，仍赶在 14:50 买入前。
     - cron: "5 6 * * 1-5"
-    - cron: "20 6 * * 1-5"
+    - cron: "15 6 * * 1-5"
+    - cron: "25 6 * * 1-5"
     - cron: "35 6 * * 1-5"
-  workflow_dispatch:
-    inputs:
-      force:
-        description: "强制重算并覆盖当日定稿（默认否：保持当日已有定稿不变）"
-        type: boolean
-        default: false
+    - cron: "45 6 * * 1-5"
 
 permissions:
   contents: write        # 允许把 recs.json / today.json / watch.json 提交回仓库
@@ -41,20 +38,13 @@ jobs:
       - name: 安装依赖
         run: npm ci
 
-      # ── ⓪ 今日定稿闸门（多触发点的关键，别删）────────────────────────
-      #   三个 cron 触发点共用一套流程：今日定稿若已存在，则选股与快照步骤直接跳过，
-      #   既保证「最迟 14:38 一定有定稿」，又不会重复推荐、不浪费 Actions 分钟。
-      #   勾选 force=1 时跳过闸门，强制执行。
+      # ── ⓪ 今日定稿闸门（5 档 cron 的关键，别删）──────────────────────
+      #   5 个触发点共用一套流程：今日定稿若已存在，选股与快照直接跳过，
+      #   既保证「最迟 14:48 一定有定稿」，又不会重复推荐、不浪费 Actions 分钟。
       - name: 今日定稿闸门
         id: gate
         shell: bash
         run: |
-          FORCE="${{ github.event.inputs.force || '' }}"
-          if [ "$FORCE" = "true" ]; then
-            echo "已勾选 force，跳过闸门"
-            echo "already=0" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
           TODAY=$(TZ=Asia/Shanghai date +%Y%m%d)
           if grep -q "\"date\": \"$TODAY\"" recs.json 2>/dev/null; then
             echo "今日 $TODAY 定稿已存在 -> 跳过选股与快照"
@@ -65,7 +55,7 @@ jobs:
           fi
 
       # ── ① 尾盘荐股：产出 recs.json（历史存档，多期累积）──────────────
-      #   当日已有定稿则跳过重算（冻结）；勾选 force 可强制覆盖。
+      #   当日已有定稿则跳过重算（冻结），不覆盖。
       - name: 运行稳健版选股并生成 recs.json
         if: steps.gate.outputs.already != '1'
         run: node generate.js
@@ -74,7 +64,6 @@ jobs:
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CF_KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
-          FORCE: ${{ github.event.inputs.force || '' }}
 
       # ── ② 全模块快照：产出 today.json（当日覆盖）+ watch.json（自选行情）
       #     覆盖前端 T1D 内嵌快照的 12 个字段：index / market_stat / zt_total /
@@ -137,7 +126,7 @@ jobs:
           echo "$HASH" > .build-commit
           echo "哈希文件已生成（供外部部署脚本读取）"
 
-      # ── ④ 上传产物，便于手动下载检查 ───────────────────────────────
+      # ── ④ 上传产物，便于事后下载检查 ───────────────────────────────
       - name: 上传产物
         uses: actions/upload-artifact@v4
         if: always()

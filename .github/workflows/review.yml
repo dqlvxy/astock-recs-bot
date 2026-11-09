@@ -5,7 +5,6 @@ name: 每日收盘复盘 + 策略自动优化
 on:
   schedule:
     - cron: "30 7 * * 1-5"
-  workflow_dispatch:
 
 permissions:
   contents: write        # 允许把 review_log.json / params.json / review.md 提交回仓库
