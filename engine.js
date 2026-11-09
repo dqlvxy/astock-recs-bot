@@ -85,6 +85,17 @@ function today() {
 function 今日键() {
   return today();
 }
+/* 日期键（YYYYMMDD 字符串）加减天数，用于「保留近 180 天」的窗口计算。
+   统一在中午 12:00 取基准，避开夏令时/时区边界把日期推错一天。
+   解析失败原样返回，调用方据此退化为「按期数保留」兜底。 */
+function 日期键偏移(键, 天数) {
+  const s = String(键 || "");
+  if (s.length !== 8) return s;
+  const d = new Date(`${s.slice(0, 4)}/${s.slice(4, 6)}/${s.slice(6, 8)} 12:00:00`);
+  if (isNaN(d.getTime())) return s;
+  d.setDate(d.getDate() + (天数 || 0));
+  return d.getFullYear() + ("0" + (d.getMonth() + 1)).slice(-2) + ("0" + d.getDate()).slice(-2);
+}
 function calcMA(arr, n) {
   if (!arr || arr.length < n) return null;
   let s = 0;
@@ -1414,6 +1425,7 @@ export {
   runStable,
   选股日键,
   今日键,
+  日期键偏移,
   是周末,
   是休市日,
   拉全市场,
