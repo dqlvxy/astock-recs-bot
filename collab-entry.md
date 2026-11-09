@@ -82,14 +82,14 @@ astock-recs-bot/                仓库根
 
 | 项 | 值 |
 |---|---|
-| 端点 | `https://astock-mcp.pages.dev/mcp` |
+| 端点 | `https://astock-mcp.pages.dev/api/mcp`（注意是 `/api/mcp`，旧的 `/mcp` 已 404） |
 | 协议 | MCP Streamable HTTP（JSON-RPC 2.0） |
 | 鉴权 | Header `Authorization: Bearer <MCP_TOKEN>`（口令向用户索取，不写进任何文件） |
 | 可操作仓库 | `dqlvxy/astock-recs-bot` @ `main`，**唯一**目标 |
 
 在豆包/扣子的「MCP 服务器」里新增一条：类型选 HTTP/SSE，URL 填上面端点，自定义 Header 加一行 `Authorization: Bearer <MCP_TOKEN>`。
 
-### 6.2 八个工具
+### 6.2 十二个工具（含 2 个 Actions 只读）
 
 | 工具 | 用途 | 关键参数 |
 |---|---|---|
@@ -101,6 +101,8 @@ astock-recs-bot/                仓库根
 | `write_file` | 新建或整文件覆盖，自动取旧 sha | `path` `content` `message` `allow_data_file` |
 | `delete_file` | 删文件 | `path` `message` |
 | `append_log` | 往 `collab-log.md` 变更记录顶部追加一行 | `device` `files` `summary` `commit` `verify` |
+| `actions_list` | **查 Actions 运行**（只读）：某仓库最近 N 次 workflow run 的 id / 工作流名 / 事件 / 结论 / 分支 / sha / 时间 | `repo` `limit` `branch` `workflow` |
+| `actions_get` | **读 Actions 详情**（只读）：按 run_id 取作业与每一步结论，附 `failed_steps` 汇总 | `run_id` `repo` |
 
 ### 6.3 每次动手的固定顺序
 
