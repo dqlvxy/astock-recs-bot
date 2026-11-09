@@ -2,16 +2,21 @@
 //
 // 存档目标（自动降级）：
 //   ① 若配了 CF_* 凭据（KV 权限）→ 写 Cloudflare KV
-//   ② 否则 → 写本地 recs.json（含近 12 期历史，供 Pages 静态托管 / jsdelivr 读取）
+//   ② 否则 → 写本地 recs.json（含近 180 天历史，供 Pages 静态托管 / jsdelivr 读取）
 //
 // recs.json 结构（前端契约）：
 //   { ok:true, updated:"2026-10-08 14:32", count:N, recs:[ { date, gen_time, picks:[...] }, ... ] }
 //
 // KV key（当 ① 可用时）：
 //   astock_recs_stable  —— 最新一期存档（供前端 后端地址 拉取）
-//   astock_recs_history —— 历史期数组（近 12 期，用于跨期去重）
-import { runStable, 今日键, 是周末, 是休市日 } from "./engine.js";
+//   astock_recs_history —— 历史期数组（近 180 天，用于跨期去重与 6 个月胜率统计）
+import { runStable, 今日键, 是周末, 是休市日, 日期键偏移 } from "./engine.js";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
+
+/* 存档保留天数（2026-11-09 老板要求：保留 6 个月的股票并统计 6 个月胜率）。
+   180 天 ≈ 120 个交易日，约 600 条推荐记录。改这里即改全链路窗口，
+   review.js 的复盘与胜率统计会读同一份 recs.json，窗口自动对齐。 */
+const 保留天数 = 180;
 
 const CF_ACCOUNT_ID = process.env.CF_ACCOUNT_ID;
 const CF_KV_NAMESPACE_ID = process.env.CF_KV_NAMESPACE_ID;
@@ -129,6 +134,27 @@ function 精简期(g) {
   };
 }
 
+/* 远期期的轻量精简（2026-11-09，配合 6 个月留存）：
+   保留 180 天后，若每期都带 reasons / scores_detail / 共振 这些大字段，
+   120 期 × 5 只 × 约 2.8KB ≈ 1.7MB，手机端每次拉取都要背上整包，不可接受。
+   故：最近 30 期保留全字段（看板「推荐依据」弹窗只用得到近期），
+   更早的期剥掉展示型大字段，只留统计与回溯必需（代码、日期、等级、买入价、止损、形态、涨幅）。
+   剥离不影响 review.js 复盘：它只需要 code / date / tier / pct_chg / pct_chg_5d。 */
+function 轻量期(g) {
+  return {
+    date: g.date,
+    gen_time: g.gen_time || "",
+    picks: (g.picks || []).map((x) => ({
+      code: x.code, name: x.name, prob: x.prob, score: x.score,
+      buy_price: x.buy_price, stop_loss: x.stop_loss, industry: x.industry,
+      buy_type: x.buy_type, tier: x.tier || "A", tier_name: x.tier_name || "常规",
+      is_main: x.is_main, pct: x.pct, pct_chg: x.pct_chg, pct_chg_5d: x.pct_chg_5d,
+      turnover: x.turnover, vol_ratio: x.vol_ratio, price: x.price,
+      float_mv: x.float_mv, buyable: x.buyable !== false, 精简: 1,
+    })),
+  };
+}
+
 async function main() {
   const 今日 = 今日键();
   if (是周末() || 是休市日(今日)) {
@@ -173,11 +199,21 @@ async function main() {
   }
 
   const 新期 = 精简期(res);
-  const 新历史 = (Array.isArray(历史) ? 历史 : [])
+  const 去重后 = (Array.isArray(历史) ? 历史 : [])
     .filter((g) => g && g.date !== 新期.date)
-    .concat([新期])
-    .sort((a, b) => (a.date < b.date ? -1 : 1))
-    .slice(-12);
+    .concat([新期]);
+  /* ── 保留 6 个月（2026-11-09 老板要求）──
+     原来 .slice(-12) 只留最近 12 期（约 2.5 周），导致「6 个月胜率」永远没有样本。
+     现改为按 180 个自然日窗口保留：约 120 个交易日、600 条推荐记录，
+     体积约 150KB（jsDelivr 单文件压缩后约 30KB），前端拉取成本可接受。
+     兜底：窗口内不足 12 期时按最近 12 期保留，防止日期异常导致存档被清空。 */
+  const 窗界 = 日期键偏移(新期.date, -保留天数);
+  let 新历史 = 去重后.filter((g) => g && g.date && g.date >= 窗界).sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (新历史.length < 12) 新历史 = 去重后.sort((a, b) => (a.date < b.date ? -1 : 1)).slice(-12);
+  /* 分层精简：最近 30 期全字段，更早的期剥掉大字段控制体积 */
+  const 全字段界 = 新历史.length > 30 ? 新历史[新历史.length - 30].date : "00000000";
+  新历史 = 新历史.map((g) => (g.date >= 全字段界 ? g : 轻量期(g)));
+  console.log(`存档保留窗口：近 ${保留天数} 天（≥${窗界}），共 ${新历史.length} 期（${全字段界} 之后保留全字段）`);
 
   if (有KV凭据) {
     await 写KV("astock_recs_stable", res);
