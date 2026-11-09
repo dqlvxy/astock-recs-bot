@@ -17,7 +17,7 @@ jobs:
       - name: 准备 Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - name: 部署看板
         run: npx --yes wrangler@4.158.0 pages deploy site --project-name=astock-board --branch=main
         env:
