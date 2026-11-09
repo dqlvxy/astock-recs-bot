@@ -1,7 +1,7 @@
 {
   "name": "网格交易策略回测工具",
   "short_name": "网格回测",
-  "description": "网格交易策略回测 + 参数跨设备存档 + 每日收盘信号，腾讯云托管 ",
+  "description": "网格交易策略回测 + 参数跨设备存档 + 每日收盘信号，腾讯云托管",
   "start_url": "/",
   "scope": "/",
   "display": "fullscreen",
