@@ -116,6 +116,9 @@ function 精简期(g) {
       /* 荐股等级（2026-11-06）：S=双金共振最高等级（MACD 刚翻红 + KDJ 低位聚合后发散）。
          漏传会导致看板拿不到等级、最高等级徽章不显示 */
       tier: x.tier || "A", tier_name: x.tier_name || "常规", 共振: x.共振 || null,
+      /* 买点七级（2026-11-09 老板定版）：一等双金共振 → 七等回踩。
+         buy_rank 供前端排序与复盘分档，买点等级是汉字名（看板直读，不用再翻译）。 */
+      buy_rank: x.buy_rank || null, 买点等级: x.买点等级 || "", 等级名: x.等级名 || "",
       is_main: x.is_main, mode: x.mode,
       pct: x.pct, pct_chg: x.pct_chg,          /* 荐股日当日涨跌幅：供看板「今日柱子」在无次日数据时兜底 */
       turnover: x.turnover, vol_ratio: x.vol_ratio,
@@ -148,6 +151,8 @@ function 轻量期(g) {
       code: x.code, name: x.name, prob: x.prob, score: x.score,
       buy_price: x.buy_price, stop_loss: x.stop_loss, industry: x.industry,
       buy_type: x.buy_type, tier: x.tier || "A", tier_name: x.tier_name || "常规",
+      /* 等级两字段体积很小（数字 + 两个汉字），远期轻量期也保留，便于长周期按等级回溯胜率 */
+      buy_rank: x.buy_rank || null, 买点等级: x.买点等级 || "",
       is_main: x.is_main, pct: x.pct, pct_chg: x.pct_chg, pct_chg_5d: x.pct_chg_5d,
       turnover: x.turnover, vol_ratio: x.vol_ratio, price: x.price,
       float_mv: x.float_mv, buyable: x.buyable !== false, 精简: 1,
