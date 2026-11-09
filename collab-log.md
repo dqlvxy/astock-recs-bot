@@ -17,7 +17,8 @@
 ## 变更记录（新的在最上面，一行一次改动）
 
 | 时间 | 设备 | 文件 | 改动内容 | commit | 线上版本 | 自检 |
-|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|| 2026-11-09 23:32 | 手机豆包 | `collab-rules.md` | 第六节步骤 1 的端点拆成 A（`astock-file-mcp.pages.dev/mcp`，8 个文件工具）/ B（`astock-mcp.pages.dev/api/mcp`，12 个功能），并注明文件工具只在 A、B 的 `file_list` 返回空属正常；初始化 #5 由「12 个工具」改为 A/B 双服务对照；初始化 #7「push 自动部署 ⏳ 待开启」改为 ✔ 已开启（`deploy.yml` `8917f6c`，最近三次 run 均 success） | 983c3e9 | — | 读回复核 12232 B，3 处旧表述均已不存在；Actions total 仍 127，未误触发部署 |
+
 | 2026-11-09 23:11 | 手机豆包 | `collab-entry.md` | 6.1 拆成服务 A（`astock-file-mcp.pages.dev/mcp`，8 工具）/ 服务 B（`astock-mcp.pages.dev/api/mcp`，12 功能）两条服务表；6.2 由「十二个工具」改为「A 8 个 + B 12 个功能」两张表；删掉「`/api/mcp` 下有 `write_file`」的错配，补「B 的 `file_list` 查中枢索引、返回空属正常」说明 | 845694d | — | GitHub Contents API 读回复核：10658 B，A/B 两端点俱在，「十二个工具」表述已不存在 |
 | 2026-11-09 22:38 | 手机端 | MCP-双服务配置.md | 并存部署文件读写 MCP（astock-file-mcp.pages.dev），恢复豆包写删；修正双服务端点说明 | 32b1c20 | — | A 写读删+3 道红线实测通过；B Actions 只读带 repo 正常 |
 | 2026-11-09 22:15 | 电脑端 | `dqlvxy/agent-hub-mcp` 的 `functions/api/mcp.js`、`collab-entry.md`、`collab-rules.md` | 给豆包开 Actions 只读：新增 `actions_list`（列 workflow run）与 `actions_get`（取作业与每一步结论，附 `failed_steps`），工具数 10→12，中文名「查 Actions 运行」「读 Actions 详情」+ 英文别名双注册；`astock-mcp` 与 `agent-hub-mcp` 两个 Pages 项目均已重新部署（`ed07d2d`）；同时修正文档里 MCP 端点路径 `/mcp`→`/api/mcp`（旧路径实测 404） | `ed07d2d` | astock-mcp / agent-hub-mcp | 线上 tools/list 24 条；本地与线上实测 `actions_list` 拉到真实 run、`actions_get` 返回逐步结论 |
