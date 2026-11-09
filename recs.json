@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "updated": "2026-11-09 12:06:13",
-  "count": 21,
+  "updated": "2026-11-09 06:58:11",
+  "count": 22,
   "recs": [
     {
       "date": "20261008",
@@ -6793,6 +6793,212 @@
           "pct_chg_5d": 11.7,
           "price": 2,
           "float_mv": 3945000000.0000005,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        }
+      ]
+    },
+    {
+      "date": "20261109",
+      "gen_time": "2026-11-09 06:58:11",
+      "picks": [
+        {
+          "code": "301459",
+          "name": "丰茂股份",
+          "prob": 69.3,
+          "score": 13,
+          "buy_price": 31.4,
+          "stop_loss": 28.89,
+          "industry": "",
+          "buy_type": "双金共振(B7)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红3天 · 形态加分 13 分 · 双金共振（日线+周线）"
+          },
+          "tier": "S",
+          "tier_name": "最高等级",
+          "共振": {
+            "翻红序": 3,
+            "前绿": 4,
+            "低位值": 15.7,
+            "聚合间距": 3.9,
+            "当前间距": 30.2,
+            "K": 47.4,
+            "D": 37.3,
+            "J": 67.5,
+            "周状态": "红柱延续",
+            "周翻红序": 0,
+            "周柱值": 0.469,
+            "周距零轴": 0,
+            "周低位值": 16.9,
+            "周聚合间距": 3.7,
+            "周当前间距": 12.5,
+            "周K": 36.2,
+            "周数": 65,
+            "周均线": null
+          },
+          "is_main": false,
+          "pct": -0.81,
+          "pct_chg": -0.81,
+          "turnover": 3.58,
+          "vol_ratio": 1.05,
+          "scores": null,
+          "scores_detail": {
+            "加分": [
+              {
+                "名称": "双金共振（最高等级）",
+                "得分": 6,
+                "说明": "MACD 3 日前翻红（前有 4 根绿柱）· KDJ 低位 15.7 聚合至 3.9 后发散至 30.2（K 47.4 / D 37.3 / J 67.5）· 周线 MACD 红柱延续（柱 0.469）· 周 KDJ 低位 16.9 发散至 12.5"
+              }
+            ]
+          },
+          "pct_chg_5d": 4.6,
+          "price": 31.75,
+          "float_mv": 828999999.9999999,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "300092",
+          "name": "科新机电",
+          "prob": 64.9,
+          "score": 9,
+          "buy_price": 10.22,
+          "stop_loss": 9.4,
+          "industry": "",
+          "buy_type": "双金共振(B7)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红3天 · 形态加分 9 分 · 双金共振（日线+周线）"
+          },
+          "tier": "S",
+          "tier_name": "最高等级",
+          "共振": {
+            "翻红序": 3,
+            "前绿": 16,
+            "低位值": 17.2,
+            "聚合间距": 0,
+            "当前间距": 50.2,
+            "K": 66.9,
+            "D": 50.1,
+            "J": 100.3,
+            "周状态": "刚翻红",
+            "周翻红序": 2,
+            "周柱值": 0.128,
+            "周距零轴": 0,
+            "周低位值": 19.1,
+            "周聚合间距": 4.9,
+            "周当前间距": 23.3,
+            "周K": 38.6,
+            "周数": 65,
+            "周均线": null
+          },
+          "is_main": false,
+          "pct": 5.16,
+          "pct_chg": 5.16,
+          "turnover": 3.66,
+          "vol_ratio": 2.38,
+          "scores": null,
+          "scores_detail": {
+            "加分": [
+              {
+                "名称": "双金共振（最高等级）",
+                "得分": 6,
+                "说明": "MACD 3 日前翻红（前有 16 根绿柱）· KDJ 低位 17.2 聚合至 0 后发散至 50.2（K 66.9 / D 50.1 / J 100.3）· 周线 MACD 刚翻红（柱 0.128）· 周 KDJ 低位 19.1 发散至 23.3"
+              }
+            ]
+          },
+          "pct_chg_5d": 11.3,
+          "price": 11,
+          "float_mv": 2308000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "002766",
+          "name": "索菱股份",
+          "prob": 62.7,
+          "score": 7,
+          "buy_price": 4.12,
+          "stop_loss": 3.79,
+          "industry": "",
+          "buy_type": "底背离买(B5)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红4天 · 形态加分 7 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "is_main": false,
+          "pct": 0,
+          "pct_chg": 0,
+          "turnover": 1.41,
+          "vol_ratio": 0.73,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 2.2,
+          "price": 4.17,
+          "float_mv": 3574000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "300120",
+          "name": "经纬辉开",
+          "prob": 62.7,
+          "score": 7,
+          "buy_price": 8.03,
+          "stop_loss": 7.39,
+          "industry": "",
+          "buy_type": "底背离买(B5)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红3天 · 形态加分 7 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "is_main": false,
+          "pct": 3.05,
+          "pct_chg": 3.05,
+          "turnover": 5.33,
+          "vol_ratio": 0.66,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 7.8,
+          "price": 8.45,
+          "float_mv": 4465000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "600540",
+          "name": "新赛股份",
+          "prob": 61.6,
+          "score": 6,
+          "buy_price": 4.25,
+          "stop_loss": 3.91,
+          "industry": "",
+          "buy_type": "强势延续(B6)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红2天 · 形态加分 6 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "is_main": false,
+          "pct": 8.73,
+          "pct_chg": 8.73,
+          "turnover": 31.22,
+          "vol_ratio": 3.42,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 23.6,
+          "price": 4.98,
+          "float_mv": 2895000000,
           "buyable": true,
           "buyable_note": "未封板，可买入"
         }
