@@ -24,7 +24,12 @@ function 读动态参数() {
        → 列为尾盘荐股最高等级（S 级），综合分额外加分、组合构建优先占位。
        低位阈值 30 = K 值曾进超卖区；聚合阈值 8 = 三线极差收敛到 8 以内视为粘合；
        发散窗口 5 = 聚合须发生在近 5 日内；刚翻红窗口 3 = 翻红须在近 3 日内（含当日） */
-    KDJ低位阈值: 30, KDJ聚合阈值: 8, KDJ发散窗口: 5, 刚翻红窗口: 3, 双金加分: 6, 双金只数: 2,
+    KDJ低位阈值: 20, KDJ聚合阈值: 8, KDJ发散窗口: 5, 刚翻红窗口: 3, 双金加分: 6, 双金只数: 2,
+    /* 2026-11-09 老板要求：B7 由「日线单周期」升级为「日线 + 周线双周期共振」。
+       日线：MACD 刚翻红 + KDJ 在 ≤20 处聚合后向上发散（低位阈值由 30 收紧到 20）。
+       周线：MACD 刚翻红 或 即将翻红（红柱临门）+ KDJ 在 ≤20 处聚合后向上发散。
+       周线由日 K 聚合而成（见 聚合成周K），不额外请求接口。 */
+    周KDJ低位阈值: 20, 周KDJ聚合阈值: 8, 周KDJ发散窗口: 5, 周MACD翻红窗口: 5, 周即将翻红容差: 0.5,
     /* 金叉必选 = 1：技术信号票（MACD金叉 / 均线金叉 / 底背离）≥5 只时只从信号票中选股；
        <5 只时自动放宽（全部候选参与、加分仍生效），避免弱势市况选不出票而空仓 */
     金叉必选: 1,
@@ -44,6 +49,8 @@ function 读动态参数() {
       v("金叉必选", 0, 1);
       v("KDJ低位阈值", 15, 45); v("KDJ聚合阈值", 3, 15); v("KDJ发散窗口", 2, 10);
       v("刚翻红窗口", 1, 5); v("双金加分", 3, 10); v("双金只数", 1, 3);
+      v("周KDJ低位阈值", 10, 40); v("周KDJ聚合阈值", 3, 15); v("周KDJ发散窗口", 2, 10);
+      v("周MACD翻红窗口", 1, 8); v("周即将翻红容差", 0.1, 2);
       v("强势延续下限", 3, 9.5); v("回调回踩下限", -6, 0); v("回调回踩上限", 0, 3);
       v("强势延续只数", 1, 3);
       v("常态只数", 3, 8); v("弱市只数", 1, 5); v("冰点只数", 1, 4); v("极弱只数", 1, 3);
@@ -445,8 +452,8 @@ async function 拉全市场() {
 async function 取日K(代码) {
   const 全码 = /^[a-z]{2}/.test(代码) ? 代码 : 代码.charAt(0) === "6" ? "sh" + 代码 : "sz" + 代码;
   const 址表 = [
-    "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/newfqkline/get?param=" + 全码 + ",day,,,80,qfq",
-    "https://web.ifzq.gtimg.cn/appstock/app/kline/kline?param=" + 全码 + ",day,,,80",
+    "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/newfqkline/get?param=" + 全码 + ",day,,,300,qfq",
+    "https://web.ifzq.gtimg.cn/appstock/app/kline/kline?param=" + 全码 + ",day,,,300",
   ];
   for (const 址 of 址表) {
     try {
@@ -767,14 +774,125 @@ function kdjSeries(rows) {
   return { kArr, dArr, jArr, K: kArr[n - 1], D: dArr[n - 1], J: jArr[n - 1] };
 }
 
-/* 双金共振判定：命中返回明细对象，否则 null */
-function detect双金共振(mc, kdj) {
-  if (!mc || !mc.histArr || !kdj || !kdj.kArr) return null;
-  const h = mc.histArr,
-    n = h.length;
-  const 窗 = Math.max(1, Math.round(CFG.刚翻红窗口 || 3));
+/* ── 周 K 聚合（2026-11-09）──
+   周线 MACD / KDJ 由已拉取的日 K 聚合而成，不额外请求接口。
+   分组键：以周一为周首，用「距 1970-01-05（周一）的天数 ÷ 7」取整，跨年不错位；
+   日期按 UTC 解析，避免沙箱与 Actions 时区差导致跨周误判。
+   聚合规则：开 = 周内首日开、收 = 周内末日收、高 = 周内最高、低 = 周内最低、量 = 周内求和。
+   注意：最后一根是「本周进行中」的半周线，按看盘软件惯例保留——它代表最新动能。 */
+function 聚合成周K(rows) {
+  if (!rows || rows.length < 5) return [];
+  const 周表 = new Map();
+  for (const r of rows) {
+    const t = Date.parse(String(r.TRADE_DATE) + "T00:00:00Z");
+    if (!isFinite(t)) continue;
+    const 周键 = Math.floor((t / 86400000 - 4) / 7);
+    const 周 = 周表.get(周键);
+    if (!周) {
+      周表.set(周键, {
+        TRADE_DATE: r.TRADE_DATE, OPEN_PRICE: r.OPEN_PRICE, CLOSE_PRICE: r.CLOSE_PRICE,
+        HIGH_PRICE: r.HIGH_PRICE, LOW_PRICE: r.LOW_PRICE, VOLUME: r.VOLUME || 0,
+      });
+    } else {
+      周.CLOSE_PRICE = r.CLOSE_PRICE;
+      周.TRADE_DATE = r.TRADE_DATE;
+      if (r.HIGH_PRICE > 周.HIGH_PRICE) 周.HIGH_PRICE = r.HIGH_PRICE;
+      if (r.LOW_PRICE < 周.LOW_PRICE) 周.LOW_PRICE = r.LOW_PRICE;
+      周.VOLUME += r.VOLUME || 0;
+    }
+  }
+  return [...周表.entries()].sort((a, b) => a[0] - b[0]).map((x) => x[1]);
+}
 
-  /* ① MACD 刚翻红：近 窗 日内 hist 由 ≤0 转为 >0 */
+/* 周线指标：日 K → 周 K → MACD(12,26,9) + KDJ(9,3,3)
+   MACD 需要 ≥35 根周 K（约 175 个交易日）才可信；数据不足时返回 null，
+   该票的 B7 直接不触发（宁可漏，不可用半成品指标误判）。 */
+function 周线指标(rows) {
+  const 周 = 聚合成周K(rows);
+  if (周.length < 35) return null;
+  const closes = 周.map((r) => r.CLOSE_PRICE);
+  const mc = macdSeries(closes);
+  const kdj = kdjSeries(周);
+  if (!mc || !kdj) return null;
+  return { mc, kdj, 周数: 周.length, 末收: closes[closes.length - 1] };
+}
+
+/* KDJ「低位 → 聚合 → 向上发散」三连判定（日线与周线共用同一套几何条件，只是阈值不同）
+   ② 低位：近 10 根内 K 最小值 ≤ 阈值（进过超卖区）
+   ③ 聚合：近 发散窗 根内三线极差最小值 ≤ 聚合阈值（三线粘合）
+   ④ 发散：K>D 多头排列 + K 上行 + 极差较聚合点扩大 ≥3 + J 领涨 */
+function 判断KDJ低位发散(kdj, 低位阈值, 聚合阈值, 发散窗) {
+  if (!kdj || !kdj.kArr) return null;
+  const K = kdj.kArr, D = kdj.dArr, J = kdj.jArr, m = K.length;
+  if (m < 12) return null;
+
+  const 低位窗 = Math.min(m, 10);
+  let 低位值 = 100;
+  for (let i = m - 低位窗; i < m; i++) if (K[i] < 低位值) 低位值 = K[i];
+  if (低位值 > 低位阈值) return null;
+
+  const 聚窗 = Math.min(m, Math.max(2, Math.round(发散窗 || 5)));
+  let 最小间距 = Infinity;
+  for (let i = m - 聚窗; i < m; i++) {
+    const 极差 = Math.max(K[i], D[i], J[i]) - Math.min(K[i], D[i], J[i]);
+    if (极差 < 最小间距) 最小间距 = 极差;
+  }
+  if (最小间距 > 聚合阈值) return null;
+
+  const 当前极差 = Math.max(K[m - 1], D[m - 1], J[m - 1]) - Math.min(K[m - 1], D[m - 1], J[m - 1]);
+  if (!(K[m - 1] > D[m - 1])) return null;
+  if (!(K[m - 1] > K[m - 2])) return null;
+  if (!(当前极差 >= 最小间距 + 3)) return null;
+  if (!(J[m - 1] >= K[m - 1])) return null;
+
+  const r1 = (x) => Math.round(x * 10) / 10;
+  return { 低位值: r1(低位值), 聚合间距: r1(最小间距), 当前间距: r1(当前极差),
+    K: r1(K[m - 1]), D: r1(D[m - 1]), J: r1(J[m - 1]) };
+}
+
+/* 周线 MACD「刚翻红 或 即将翻红」
+   刚翻红：近 翻红窗口 周内 hist 由 ≤0 转 >0，且当前仍在红柱区；
+   即将翻红：hist 仍为负，但同时满足——连续收窄（本周 > 上周）、贴近零轴（|hist|/收盘 ≤ 容差%）、
+             DIF 上行。三条缺一不可，避免把「绿柱缩短但离零轴很远」的下跌中继误判成临门一脚。 */
+function 判断周MACD红临门(mc, 收盘) {
+  if (!mc || !mc.histArr || !mc.difArr) return null;
+  const h = mc.histArr, d = mc.difArr, n = h.length;
+  if (n < 3) return null;
+  const 窗 = Math.max(1, Math.round(CFG.周MACD翻红窗口 || 3));
+
+  let 翻红序 = 0;
+  for (let k = 0; k < 窗; k++) {
+    const i = n - 1 - k;
+    if (i < 1) break;
+    if (h[i] > 0 && h[i - 1] <= 0) { 翻红序 = k + 1; break; }
+  }
+  if (翻红序 && h[n - 1] > 0) {
+    let 前绿 = 0;
+    for (let i = n - 1 - 翻红序; i >= 0 && h[i] <= 0; i--) 前绿++;
+    return { 状态: "刚翻红", 翻红序, 前绿, 柱值: Math.round(h[n - 1] * 1000) / 1000, 距零轴: 0 };
+  }
+
+  const 容差 = (CFG.周即将翻红容差 || 0.5) / 100;
+  if (h[n - 1] < 0 && h[n - 1] > h[n - 2] && 收盘 > 0 &&
+      Math.abs(h[n - 1]) / 收盘 <= 容差 && d[n - 1] > d[n - 2]) {
+    return { 状态: "即将翻红", 翻红序: 0, 前绿: 0,
+      柱值: Math.round(h[n - 1] * 1000) / 1000,
+      距零轴: Math.round((Math.abs(h[n - 1]) / 收盘) * 10000) / 100 };
+  }
+  return null;
+}
+
+/* ══ 双金共振（B7）· 日线 + 周线双周期共振（2026-11-09 老板要求升级）══
+   日线：MACD 刚翻红（hist 由绿转红，前有 ≥3 根绿柱）+ KDJ 在 ≤20 处聚合后向上发散
+   周线：MACD 刚翻红 或 即将翻红 + KDJ 在 ≤20 处聚合后向上发散
+   两者同时成立才判 S 级。单周期命中不再算——原来只看日线，把「日线刚启动、周线还在下行」的
+   反弹中继也算成最高等级，S 级含金量被稀释（实测日线单条件命中率高达 57%）。 */
+function detect双金共振(mc, kdj, 周) {
+  if (!mc || !mc.histArr || !kdj || !kdj.kArr) return null;
+
+  /* ── 第一层：日线 ── */
+  const h = mc.histArr, n = h.length;
+  const 窗 = Math.max(1, Math.round(CFG.刚翻红窗口 || 3));
   let 翻红序 = 0;
   for (let k = 0; k < 窗; k++) {
     const i = n - 1 - k;
@@ -788,37 +906,23 @@ function detect双金共振(mc, kdj) {
   for (let i = n - 1 - 翻红序; i >= 0 && h[i] <= 0; i--) 前绿++;
   if (前绿 < 3) return null;                              /* 水下翻红，非零轴抖动 */
 
-  /* ② KDJ 低位：近 10 日内 K 曾进入超卖区 */
-  const K = kdj.kArr,
-    D = kdj.dArr,
-    J = kdj.jArr,
-    m = K.length;
-  const 低位窗 = Math.min(m, 10);
-  let 低位值 = 100;
-  for (let i = m - 低位窗; i < m; i++) if (K[i] < 低位值) 低位值 = K[i];
-  if (低位值 > CFG.KDJ低位阈值) return null;
+  const 日 = 判断KDJ低位发散(kdj, CFG.KDJ低位阈值, CFG.KDJ聚合阈值, CFG.KDJ发散窗口);
+  if (!日) return null;
 
-  /* ③ 聚合：近 发散窗口 日内三线极差收敛到阈值以内 */
-  const 聚窗 = Math.min(m, Math.max(2, Math.round(CFG.KDJ发散窗口 || 5)));
-  let 最小间距 = Infinity;
-  for (let i = m - 聚窗; i < m; i++) {
-    const 极差 = Math.max(K[i], D[i], J[i]) - Math.min(K[i], D[i], J[i]);
-    if (极差 < 最小间距) 最小间距 = 极差;
-  }
-  if (最小间距 > CFG.KDJ聚合阈值) return null;
+  /* ── 第二层：周线 ── */
+  if (!周 || !周.mc || !周.kdj) return null;
+  const 周红 = 判断周MACD红临门(周.mc, 周.末收);
+  if (!周红) return null;
+  const 周线KDJ = 判断KDJ低位发散(周.kdj, CFG.周KDJ低位阈值, CFG.周KDJ聚合阈值, CFG.周KDJ发散窗口);
+  if (!周线KDJ) return null;
 
-  /* ④ 向上发散：多头排列 + K 上行 + 极差扩大 + J 领涨 */
-  const 当前极差 = Math.max(K[m - 1], D[m - 1], J[m - 1]) - Math.min(K[m - 1], D[m - 1], J[m - 1]);
-  if (!(K[m - 1] > D[m - 1])) return null;
-  if (!(K[m - 1] > K[m - 2])) return null;
-  if (!(当前极差 >= 最小间距 + 3)) return null;
-  if (!(J[m - 1] >= K[m - 1])) return null;
-
-  const r1 = (x) => Math.round(x * 10) / 10;
   return {
     翻红序, 前绿,
-    低位值: r1(低位值), 聚合间距: r1(最小间距), 当前间距: r1(当前极差),
-    K: r1(K[m - 1]), D: r1(D[m - 1]), J: r1(J[m - 1]),
+    低位值: 日.低位值, 聚合间距: 日.聚合间距, 当前间距: 日.当前间距,
+    K: 日.K, D: 日.D, J: 日.J,
+    周状态: 周红.状态, 周翻红序: 周红.翻红序, 周柱值: 周红.柱值, 周距零轴: 周红.距零轴,
+    周低位值: 周线KDJ.低位值, 周聚合间距: 周线KDJ.聚合间距, 周当前间距: 周线KDJ.当前间距,
+    周K: 周线KDJ.K, 周数: 周.周数,
   };
 }
 
@@ -842,7 +946,8 @@ function hardFilter(pool, klineMap) {
   const out = [];
   const 统计 = { 输入: pool.length, 数据不足: 0, 均线不足: 0, 连板剔除: 0, 急涨剔除: 0,
     均线空头: 0, 均线未上行: 0, 死叉剔除: 0, 均线死叉剔除: 0, 顶背离剔除: 0, 形态不符: 0,
-    量比剔除: 0, 换手剔除: 0, 通过: 0, 金叉票: 0, 均线金叉票: 0, 底背离票: 0, 强势延续票: 0, 涨停回调票: 0, 双金票: 0 };
+    量比剔除: 0, 换手剔除: 0, 通过: 0, 金叉票: 0, 均线金叉票: 0, 底背离票: 0, 强势延续票: 0, 涨停回调票: 0, 双金票: 0, 周线不足: 0,
+    日线KDJ达标: 0, 周MACD达标: 0, 周KDJ达标: 0 };
   for (const p of pool) {
     const rows = klineMap[p.code];
     if (!rows || rows.length < 35) { 统计.数据不足++; continue; }
@@ -858,7 +963,20 @@ function hardFilter(pool, klineMap) {
     /* MACD / KDJ 提前到均线关卡之前计算：B7 双金票需要据此豁免均线多头（见下） */
     const mc = macdSeries(closes);
     const kdj = kdjSeries(rows);
-    const 双金 = detect双金共振(mc, kdj);
+    /* 周线需 ≥35 根周 K（约 175 个交易日）。不足即 B7 不触发，单独计数，
+       避免「周线数据拿不到」被误读成「周线条件筛得严」。 */
+    const 周 = 周线指标(rows);
+    if (!周) 统计.周线不足++;
+    /* 分层计数：全池（含后面会被均线关剔除的票）里各子条件的绝对通过数。
+       用途：B7 长期不命中时，一眼看出是日线、周线 MACD 还是周线 KDJ 卡住，
+       不必再写一次性诊断脚本。分母都是「输入」池。 */
+    const 日K达标 = !!判断KDJ低位发散(kdj, CFG.KDJ低位阈值, CFG.KDJ聚合阈值, CFG.KDJ发散窗口);
+    const 周MACD达标 = !!(周 && 判断周MACD红临门(周.mc, 周.末收));
+    const 周KDJ达标 = !!(周 && 判断KDJ低位发散(周.kdj, CFG.周KDJ低位阈值, CFG.周KDJ聚合阈值, CFG.周KDJ发散窗口));
+    if (日K达标) 统计.日线KDJ达标++;
+    if (周MACD达标) 统计.周MACD达标++;
+    if (周KDJ达标) 统计.周KDJ达标++;
+    const 双金 = detect双金共振(mc, kdj, 周);
     const 末收 = closes[closes.length - 1];
     /* B7 均线替代条件：MACD 刚翻红 + KDJ 低位发散本质是「底部第一波启动」，
        此时均线天然尚未多头排列（要求多头会永远选不出票）。
@@ -1236,6 +1354,10 @@ export {
   macdSeries,
   kdjSeries,
   detect双金共振,
+  聚合成周K,
+  周线指标,
+  判断KDJ低位发散,
+  判断周MACD红临门,
   detect涨停回调,
   mainLines,
   temperature,
