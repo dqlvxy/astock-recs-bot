@@ -78,22 +78,34 @@ astock-recs-bot/                仓库根
 
 ## 六、你是豆包：怎么读写仓库
 
-### 6.1 连接方式
+### 6.1 连接方式（两条服务，分工不同）
 
-| 项 | 值 |
-|---|---|
-| 端点 | `https://astock-mcp.pages.dev/api/mcp`（注意是 `/api/mcp`，旧的 `/mcp` 已 404） |
-| 协议 | MCP Streamable HTTP（JSON-RPC 2.0） |
-| 鉴权 | Header `Authorization: Bearer <MCP_TOKEN>`（口令向用户索取，不写进任何文件） |
-| 可操作仓库 | `dqlvxy/astock-recs-bot` @ `main`，**唯一**目标 |
+| 项 | 服务 A · 仓库文件读写 | 服务 B · 协作中枢 + Actions 只读 |
+|---|---|---|
+| 端点 | `https://astock-file-mcp.pages.dev/mcp` | `https://astock-mcp.pages.dev/api/mcp`（旧的 `/mcp` 已 404） |
+| 协议 | MCP Streamable HTTP（JSON-RPC 2.0） | 同左 |
+| 鉴权 | `Authorization: Bearer <MCP_TOKEN>` | 同一个 `Authorization: Bearer <MCP_TOKEN>` |
+| 能干什么 | 读 / 写 / 删仓库文件，8 个工具 | 项目状态、产物索引、交接日志、聊天摘要、Actions 只读，12 个功能 |
+| 碰不碰仓库文件 | 就是它在碰 | **完全不碰** |
+| 可操作仓库 | `dqlvxy/astock-recs-bot` @ `main`，**唯一**目标 | 默认账本为 `dqlvxy/astock-recs-bot`；`actions_*` 必须显式带 `repo` |
 
-在豆包/扣子的「MCP 服务器」里新增一条：类型选 HTTP/SSE，URL 填上面端点，自定义 Header 加一行 `Authorization: Bearer <MCP_TOKEN>`。
+> **两条服务共用同一口令**，但能力不重叠。文件读写只在 A；B 没有 `read_file` / `write_file` / `delete_file`。
+> **为什么「云上看不到文件」**：B 的 `file_list` 查的是中枢索引（产物登记表），不是 GitHub 仓库目录，返回空是正常现象；`project_count:0` / `file_count:0` 同理，不是故障。要看真文件，去 A。
 
-### 6.2 十二个工具（含 2 个 Actions 只读）
+在豆包/扣子的「MCP 服务器」里**各新增一条**，类型都选 HTTP/SSE：
+
+| 服务 | URL 填 | 自定义 Header |
+|---|---|---|
+| A | `https://astock-file-mcp.pages.dev/mcp` | `Authorization: Bearer <MCP_TOKEN>` |
+| B | `https://astock-mcp.pages.dev/api/mcp` | `Authorization: Bearer <MCP_TOKEN>` |
+
+### 6.2 工具清单：A 8 个 + B 12 个功能
+
+**服务 A · 仓库文件读写（8 个）**
 
 | 工具 | 用途 | 关键参数 |
 |---|---|---|
-| `status` | 仓库 HEAD、最近 5 次提交、关键文件大小 | — |
+| `status` | 仓库 HEAD、最近提交、关键文件大小 | — |
 | `list_dir` | 列目录 | `path`（根目录传 `""`） |
 | `read_file` | 读文本文件，超 300KB 截断 | `path` `max_chars` |
 | `search_in_file` | 单文件内搜关键词，返回行号与整行 | `path` `keyword` `context` |
@@ -101,8 +113,21 @@ astock-recs-bot/                仓库根
 | `write_file` | 新建或整文件覆盖，自动取旧 sha | `path` `content` `message` `allow_data_file` |
 | `delete_file` | 删文件 | `path` `message` |
 | `append_log` | 往 `collab-log.md` 变更记录顶部追加一行 | `device` `files` `summary` `commit` `verify` |
-| `actions_list` | **查 Actions 运行**（只读）：某仓库最近 N 次 workflow run 的 id / 工作流名 / 事件 / 结论 / 分支 / sha / 时间 | `repo` `limit` `branch` `workflow` |
-| `actions_get` | **读 Actions 详情**（只读）：按 run_id 取作业与每一步结论，附 `failed_steps` 汇总 | `run_id` `repo` |
+
+**服务 B · 协作中枢 + Actions 只读（12 个功能）**
+
+| 功能（英文别名） | 用途 |
+|---|---|
+| `status` | 中枢概览：项目数、文件数、最近交接（**不是** A 的仓库 status） |
+| `project_list` / `project_get` / `project_set` | 项目状态盘点、读取、整体覆盖写 |
+| `file_put` / `file_list` | 产物文件与链接索引（**不是**仓库源码，所以常为空） |
+| `handoff_append` / `handoff_list` | 交接日志写与读 |
+| `chat_summary_append` / `chat_summary_list` | 聊天摘要（要点，非原文） |
+| `actions_list` | **只读**：某仓库最近 N 次 workflow run 的 id / 工作流名 / 事件 / 结论 / 分支 / sha / 时间 | `repo` `limit` `branch` `workflow` |
+| `actions_get` | **只读**：按 run_id 取作业与每一步结论，附 `failed_steps` 汇总 | `run_id` `repo` |
+
+> 两个 `actions_*` 必须带 `repo: "dqlvxy/astock-recs-bot"`，不带会因路径缺 repo 返回 404。
+> B 的 12 个功能各有一个中文名与英文别名两套名字，合计 24 个名字（详见 `MCP-双服务配置.md`）。
 
 ### 6.3 每次动手的固定顺序
 
