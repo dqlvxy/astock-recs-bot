@@ -20,28 +20,40 @@ jobs:
         with:
           node-version: 22
 
-      - name: 查生产分支并部署
+      - name: 诊断并部署
         working-directory: deploy-agenthub-oneshot
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
         run: |
-          set -e
-          echo "第一步：核对令牌与项目"
-          curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            "https://api.cloudflare.com/client/v4/user/tokens/verify" \
-            | jq -r '"token_ok=" + (.success|tostring) + " status=" + (.result.status // "n/a")'
-          PROJ=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/agent-hub-mcp")
-          echo "$PROJ" | jq -r '"project=" + (.result.name // "NONE") + " prod_branch=" + (.result.production_branch // "NONE") + " success=" + (.success|tostring)'
-          BRANCH=$(echo "$PROJ" | jq -r '.result.production_branch // "main"')
-          echo "本次按生产分支 $BRANCH 部署"
-          echo "第二步：wrangler 部署"
+          set -u
+          API=https://api.cloudflare.com/client/v4
+          echo "===== 1 令牌自检 ====="
+          curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$API/user/tokens/verify" \
+            | jq -c '{success:.success,errors:.errors,status:.result.status}'
+          echo "===== 2 账户自检（账号 ID 是否有效）====="
+          echo "account_id_len=${#CLOUDFLARE_ACCOUNT_ID}"
+          curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$API/accounts/$CLOUDFLARE_ACCOUNT_ID" \
+            | jq -c '{success:.success,errors:.errors,id:.result.id,name:.result.name}'
+          echo "===== 3 账户下现有 Pages 项目 ====="
+          curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects?per_page=50" \
+            | jq -c '{success:.success,errors:.errors,names:[.result[]?.name]}'
+          echo "===== 4 目标项目详情 ====="
+          PROJ=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$API/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/agent-hub-mcp")
+          echo "$PROJ" | jq -c '{success:.success,errors:.errors,name:.result.name,branch:.result.production_branch,domains:.result.domains}'
+          PROJ_OK=$(echo "$PROJ" | jq -r '.success')
+          echo "===== 5 不存在则创建 ====="
+          if [ "$PROJ_OK" != "true" ]; then
+            echo "读取不到目标项目，尝试创建"
+            npx --yes wrangler@4.158.0 pages project create agent-hub-mcp --production-branch=main || echo "创建命令返回非零，继续尝试部署"
+          else
+            echo "项目已存在，跳过创建"
+          fi
+          echo "===== 6 wrangler 部署 ====="
           npx --yes wrangler@4.158.0 pages deploy \
             --project-name=agent-hub-mcp \
-            --branch="$BRANCH" \
+            --branch=main \
             --commit-dirty=true
-          echo "第三步：回读线上状态"
-          curl -s -o /tmp/probe.json -w "probe_http=%{http_code}\n" \
-            "https://agent-hub-mcp.pages.dev/api/mcp"
-          head -c 200 /tmp/probe.json; echo
+          echo "===== 7 回读线上探活 ====="
+          curl -s -o /tmp/probe.json -w "probe_http=%{http_code}\n" "https://agent-hub-mcp.pages.dev/api/mcp"
+          head -c 300 /tmp/probe.json; echo
