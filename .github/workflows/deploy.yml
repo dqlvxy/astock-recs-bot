@@ -1,0 +1,30 @@
+name: 部署前端到 Cloudflare Pages
+
+"on":
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'grid/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取仓库
+        uses: actions/checkout@v4
+      - name: 准备 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: 部署看板
+        run: npx --yes wrangler@4.158.0 pages deploy site --project-name=astock-board --branch=main
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      - name: 部署网格
+        run: npx --yes wrangler@4.158.0 pages deploy grid --project-name=astock-grid --branch=main
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
