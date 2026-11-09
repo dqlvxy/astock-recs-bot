@@ -18,7 +18,7 @@
 |---|---|---|---|
 | ① 策略引擎 | 仓库根（`engine.js` 等） | 无独立域名，产物进仓库 | GitHub Actions 每交易日 14:05–14:45 五档 cron 自动跑，产出 `recs.json` / `today.json` / `watch.json`；15:30 跑 `review.js` 复盘与账户模拟 |
 | ② 看板 | `site/` | `astock-board-9t0.pages.dev` | 单文件 `index.html`（约 720KB），`functions/api/*.js` 7 个边缘代理，从 GitHub raw 读数 |
-| ③ 网格回测 | `grid/` | `astock-grid.surge.sh` | 单文件 `index.html`（约 132KB），跌买涨卖逆向网格，与另两个模块完全独立 |
+| ③ 网格回测 | `grid/` | `astock-grid.pages.dev`（原 surge 域名不再更新） | 单文件 `index.html`（约 132KB），跌买涨卖逆向网格，与另两个模块完全独立 |
 
 依赖关系：② 的数据全部来自 ①；③ 完全独立。
 
@@ -55,7 +55,7 @@ astock-recs-bot/                仓库根
 |---|---|
 | 最新 commit | `2b7b74c`（2026-11-09 16:10，site/ 与 grid/ 入库，四端协作 v3.0） |
 | 看板缓存版本 | `sw.js` v27（`index.html` 内 `sw.js?v=27`） |
-| 网格缓存版本 | v5 |
+| 网格缓存版本 | v6 |
 | 荐股存档期数 | 22 期（最后一期 20261109，5 只） |
 | 近 6 个月 T+1 胜率 | 52.1%（38/73），等权均收 -0.39% |
 | 账户模拟（5 万本金 / 1 万每票） | 净收益 -6.75%，最大回撤 -12.91%，费用吃掉毛利约 45.8% |
@@ -67,11 +67,14 @@ astock-recs-bot/                仓库根
 |---|---|---|---|---|---|
 | 电脑端 WorkBuddy | ✔ | ✔ | ✔ | ✔ | ✔ 需 `workflow` 权限 |
 | 手机端 WorkBuddy | ✔ | ✔ | ✔ | ✔ | ✘ 除非令牌带 `workflow` |
-| 电脑端豆包 | ✔ | ✔ | ✔ | ✘ | ✘ |
-| 手机端豆包 | ✔ | ✔ | ✔ | ✘ | ✘ |
+| 电脑端豆包 | ✔ | ✔ | ✔ | 自动 | ✘ |
+| 手机端豆包 | ✔ | ✔ | ✔ | 自动 | ✘ |
 
-**唯二差异**：豆包不能部署、不能改 `.github/workflows/**`（服务端硬拦，连 WorkBuddy 的普通令牌也拦）。
-豆包改完代码后，说一句「请 WorkBuddy 部署看板」即可，部署仍由 WorkBuddy 执行。
+**部署分两种情况**（见 `四端同步_开启自动部署.md`）：
+- 自动部署已开启：四端改完 `site/` 或 `grid/` 推送后，GitHub Actions 约 1–2 分钟自动上线，谁改都一样。
+- 尚未开启：部署仍由电脑端 WorkBuddy 用 `wrangler pages deploy` 执行，豆包改完要说「请 WorkBuddy 部署」。
+
+**唯一硬差异**：不能改 `.github/workflows/**`（服务端硬拦，普通令牌也拦）。
 
 ## 六、你是豆包：怎么读写仓库
 
@@ -119,7 +122,7 @@ status  →  list_dir(相关目录)  →  read_file(要改的文件)  →  write
 ### 6.5 改看板的两个连带动作
 
 1. 改了 `site/index.html` → `site/sw.js` 的缓存名 +1，且 `index.html` 里 `sw.js?v=N` 同步 +1，两处必须一致
-2. 改完让 WorkBuddy 跑 `cd site && bash 自检.sh`，30 项全过再部署
+2. 改完让 WorkBuddy 跑 `cd site && bash 自检.sh`，30 项全过再推送（自动部署开启后推送即上线）
 
 ## 七、你的输出该怎么写
 
