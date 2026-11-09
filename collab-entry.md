@@ -53,7 +53,7 @@ astock-recs-bot/                仓库根
 
 | 项 | 值 |
 |---|---|
-| 最新 commit | `2b7b74c`（2026-11-09 16:10，site/ 与 grid/ 入库，四端协作 v3.0） |
+| 最新 commit | 以 `git log -1` 为准（2026-11-09 21:50 电脑端回填自动部署，`deploy.yml` `8917f6c`） |
 | 看板缓存版本 | `sw.js` v27（`index.html` 内 `sw.js?v=27`） |
 | 网格缓存版本 | v6 |
 | 荐股存档期数 | 22 期（最后一期 20261109，5 只） |
@@ -70,9 +70,9 @@ astock-recs-bot/                仓库根
 | 电脑端豆包 | ✔ | ✔ | ✔ | 自动 | ✘ |
 | 手机端豆包 | ✔ | ✔ | ✔ | 自动 | ✘ |
 
-**部署分两种情况**（见 `四端同步_开启自动部署.md`）：
-- 自动部署已开启：四端改完 `site/` 或 `grid/` 推送后，GitHub Actions 约 1–2 分钟自动上线，谁改都一样。
-- 尚未开启：部署仍由电脑端 WorkBuddy 用 `wrangler pages deploy` 执行，豆包改完要说「请 WorkBuddy 部署」。
+**部署：已开启，四端 push 即上线**（2026-11-09 20:50，`deploy.yml` `8917f6c`，见 `collab-log.md` 变更记录）：
+- 四端改完 `site/` 或 `grid/` 推送到 main 后，GitHub Actions「部署前端到 Cloudflare Pages」约 1–2 分钟自动上线，谁改都一样，无需再请 WorkBuddy 手工 `wrangler pages deploy`。
+- 手动补跑入口仍在：Actions →「部署前端到 Cloudflare Pages」→ Run workflow，只部署前端，不影响荐股定时任务。
 
 **唯一硬差异**：不能改 `.github/workflows/**`（服务端硬拦，普通令牌也拦）。
 
