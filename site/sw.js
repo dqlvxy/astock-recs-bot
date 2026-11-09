@@ -4,7 +4,7 @@
            一旦把 HTML 写进缓存，手机就会长期显示改动前的旧页面
            （2026-11-06 财经快讯已删除但手机上仍在，即此坑）。
    版本策略：每次前端结构性改动，把 缓存名 的版本号 +1，旧缓存随 activate 清空。 */
-const 缓存名 = "astock-static-v27";
+const 缓存名 = "astock-static-v28";
 
 /* 仅这些后缀允许入缓存；其余（html / json / 接口响应）一律直连网络 */
 const 可缓存后缀 = [".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico", ".woff2"];
