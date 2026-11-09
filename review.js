@@ -1,6 +1,6 @@
 // review.js —— 每日收盘后复盘闭环
-//  1) 读 recs.json 全部历史荐股
-//  2) 对「推荐日之后第一个交易日」已发生的期，拉个股日K，算「次日收盘」相对「推荐日收盘」涨跌
+//  1) 读 recs.json 全部历史荐股（2026-11-09 起保留近 180 天，约 120 期）
+//  2) 对「推荐日之后第一个交易日」已发生的期，拉个股日K，算 T+1 / T+3 / T+5 收盘相对推荐日收盘的涨跌
 //  3) 归因失败票（2026-10-16 重锚持股日：用户在荐股日 14:50 买入，荐股日波动不计入盈亏）：
 //     持股日归因共十三因子（数量不固定、可继续扩展；因子名统一 4 字），全部解释持股日盈亏——
 //     市场类 5：弱市 / 板块 / 独跌 / 闷杀（跳空≤-5%贴地）/ 放量（量≥1.5倍）；
@@ -8,8 +8,8 @@
 //               缩量（量≤0.8倍且跌）/ 破位（荐股日在 MA5 上方、持股日下穿 MA5）；
 //     高位类 2：追高（荐日涨幅≥4%→持股日回吐）/ 急涨（荐日前5日累计≥30%→持股日急跌）；
 //     （原「情绪」量比换手、「连板」两条已于 2026-11-09 随引擎关卡一并删除）
-//  4) 统计滚动成功率 + 失败模式
-//  5) 输出 review_log.json（逐期明细）+ review.md（人类可读复盘报告）
+//  4) 统计滚动成功率 + 失败模式 + 近 6 个月胜率（T+1/T+3/T+5，并分 S 级 / A 级）
+//  5) 输出 review_log.json（逐期明细）+ review.md（人类可读复盘报告），均保留近 180 天
 //  6) 生成 params.json 的 cfg（滚动成功率低→温和收紧阈值，含硬上下限），供 engine.js 次日读取自适应
 //
 // 由 .github/workflows/review.yml 每天收盘后（北京时间 15:30 = UTC 07:30）自动触发
@@ -99,6 +99,29 @@ function 次日涨跌(kline, recDate) {
     }
   }
   return null;
+}
+
+/* 多周期收益（2026-11-09 老板要求：统计 6 个月胜率）。
+   同一根 K 线里一次定位推荐日，顺带取 T+1 / T+3 / T+5 收盘：
+   ret1 = 次日收盘（与既有口径完全一致，滚动成功率仍按它算，保证可比）；
+   ret3 / ret5 = 持股 3 / 5 个交易日收盘。未发生的周期返回 null，不参与统计。 */
+function 多日涨跌(kline, recDate) {
+  const 空 = { ret1: null, ret3: null, ret5: null };
+  if (!kline || !kline.length) return 空;
+  let i0 = -1;
+  for (let i = 0; i < kline.length; i++) {
+    if (kline[i].date.replace(/-/g, "") === String(recDate)) { i0 = i; break; }
+  }
+  if (i0 < 0) return 空;
+  const c0 = kline[i0].close;
+  if (!(c0 > 0)) return 空;
+  const 取 = (n) => {
+    const j = i0 + n;
+    if (j >= kline.length) return null;
+    const c = kline[j].close;
+    return c > 0 ? Math.round(((c - c0) / c0) * 10000) / 100 : null;
+  };
+  return { ret1: 取(1), ret3: 取(3), ret5: 取(5) };
 }
 
 // 推荐日前近5日累计涨幅（复刻 engine.js 急涨口径：推荐日收盘 vs 其前第 5 个交易日收盘）。
@@ -226,6 +249,47 @@ const 钳 = (v, k) => {
   return Math.min(hi, Math.max(lo, v));
 };
 
+/* 日期键加减天数（YYYYMMDD），用于「近 6 个月」窗口。
+   review.js 保持独立、不 import engine.js，故在此本地实现一份。 */
+function 日期键偏移(键, 天数) {
+  const s = String(键 || "");
+  if (s.length !== 8) return s;
+  const d = new Date(`${s.slice(0, 4)}/${s.slice(4, 6)}/${s.slice(6, 8)} 12:00:00`);
+  if (isNaN(d.getTime())) return s;
+  d.setDate(d.getDate() + (天数 || 0));
+  return d.getFullYear() + ("0" + (d.getMonth() + 1)).slice(-2) + ("0" + d.getDate()).slice(-2);
+}
+
+/* ── 区间胜率统计（2026-11-09 老板要求：统计 6 个月胜率）──
+   口径：推荐日 14:50 收盘价买入 → 持有到对应周期收盘卖出，收盘价高于买入价即算胜。
+   T1 = 次日收盘（与既有「滚动成功率」完全同源，可直接对比）；
+   T3 / T5 = 持股 3 / 5 个交易日收盘（老板实际持股 1~4 周，T5 更贴近真实兑现）。
+   分档：S 级（双金共振最高等级）与 A 级分开统计 —— 用来回答「S 级是否真的更准」，
+   若 S 级长期低于 A 级，应先收紧周线 KDJ 低位或日线聚合阈值，而不是恢复均线拦截。 */
+function 区间统计(期列表) {
+  const 全部票 = [];
+  for (const x of 期列表) for (const p of x.picks || []) if (p && p.ret != null) 全部票.push(p);
+  const 算 = (arr, 键) => {
+    const v = arr.map((p) => p[键]).filter((r) => r != null);
+    if (!v.length) return { 样本: 0, 胜: 0, 胜率: null, 均值: null };
+    const 胜 = v.filter((r) => r > 0).length;
+    return {
+      样本: v.length, 胜,
+      胜率: Math.round((胜 / v.length) * 1000) / 10,
+      均值: Math.round((v.reduce((s, r) => s + r, 0) / v.length) * 100) / 100,
+    };
+  };
+  const 档 = (名) => 全部票.filter((p) => (p.tier || "A") === 名);
+  const S = 档("S"), A = 档("A");
+  return {
+    期数: 期列表.length,
+    样本票数: 全部票.length,
+    T1: 算(全部票, "ret"), T3: 算(全部票, "ret3"), T5: 算(全部票, "ret5"),
+    S级: { 样本: S.length, T1: 算(S, "ret"), T5: 算(S, "ret5") },
+    A级: { 样本: A.length, T1: 算(A, "ret"), T5: 算(A, "ret5") },
+  };
+}
+
 function 算优化参数(items) {
   const 参数 = 默认参数();
   const 有效 = items.filter((x) => x.verifiable);
@@ -285,9 +349,11 @@ async function 主流程() {
   console.log(`复盘 ${recs.length} 期存档…`);
 
   // 已复盘记录（保留历史固定期，避免下次重复验证）
+  /* 已复盘记录：存整条期对象（不再只是打点），供增量复盘直接复用。
+     存档扩到 180 天后，全量重算会撞 Actions 超时，必须能「跳过已算满的期」。 */
   let done = {};
   if (existsSync(复盘文件)) {
-    try { const rr = JSON.parse(readFileSync(复盘文件, "utf-8")); (rr.items || []).forEach((x) => x && (done[x.date] = 1)); } catch (e) {}
+    try { const rr = JSON.parse(readFileSync(复盘文件, "utf-8")); (rr.items || []).forEach((x) => x && x.date && (done[x.date] = x)); } catch (e) {}
   }
 
   const items = [];
@@ -311,7 +377,12 @@ async function 主流程() {
     return null;
   }
   for (const g of recs) {
-    const 期 = { date: g.date, gen_time: g.gen_time || "", picks: [], verifiable: false, market_chg: null, 荐日大盘: null, 持股日: null, success: null };
+    /* 增量复盘（2026-11-09）：存档扩到 180 天后，每期每天重算会变成 120 期 × 6 次请求，
+       必然撞上 Actions 20 分钟超时。已复盘且多周期已算满（T+5 已发生）的期直接复用旧结果，
+       每天只真正计算新期与最近 5 个交易日内的期。 */
+    const 旧 = done[g.date];
+    if (旧 && 旧.verifiable && 旧.多周期 && (旧.picks || []).some((p) => p && p.ret5 != null)) { items.push(旧); continue; }
+    const 期 = { date: g.date, gen_time: g.gen_time || "", picks: [], verifiable: false, market_chg: null, 荐日大盘: null, 持股日: null, success: null, 多周期: 1 };
     const picks = g.picks || [];
     if (!picks.length) continue;
     // 推荐日之后第一个交易日是否已发生：拉该期第一只票K线，看推荐日 index+1 是否存在
@@ -328,12 +399,17 @@ async function 主流程() {
     let 涨 = 0;
     for (const p of picks) {
       const kl = await 拉K线(p.code, 15);   // 每只票独立拉K线，不能复用
-      const ret = 次日涨跌(kl, g.date);
+      const 多 = 多日涨跌(kl, g.date);
+      const ret = 多.ret1;
       const r = {
         code: p.code, name: p.name, score: p.score, prob: p.prob,
+        /* 荐股等级：S = 双金共振（最高等级）/ A = 常规。分档胜率靠它拆分，
+           缺省会全部归入 A 级，S 级统计永远为 0。 */
+        tier: p.tier === "S" ? "S" : "A",
         chg: p.pct_chg != null ? p.pct_chg : null,   // 推荐日涨幅（追高判据，持股日归因·高位类）
         chg5: p.pct_chg_5d != null ? p.pct_chg_5d : 近5涨幅(kl, g.date),   // 推荐日前近5日累计涨幅（急涨判据，持股日归因·高位类）
         ret: ret != null ? Math.round(ret * 100) / 100 : null,
+        ret3: 多.ret3, ret5: 多.ret5,   // 6 个月胜率的多周期口径（见 区间统计）
         // 持股日解剖（归因重锚：全部字段锚定持股日 = 荐股日 14:50 买入后的第一个交易日）
         ...(持股日解剖(p.code, kl, g.date, 大盘日K) || {}),
       };
@@ -345,14 +421,28 @@ async function 主流程() {
     console.log(`  期 ${g.date}: ${期.picks.filter((p)=>p.ret!=null).length}/${期.picks.length} 可验证，胜 ${涨} 只`);
   }
 
-  // 合并：历史固定期 + 本次新复盘期（按 date 去重，保留本次）
+  /* 合并：历史各期 + 本次新复盘期（按 date 去重，本次优先）。
+     2026-11-09 修正：原逻辑只保留「未验证」的历史项，已复盘期一旦从 recs.json 掉出窗口
+     就永久丢失，6 个月样本无从累积。现改为保留全部历史项，只由本次结果覆盖同期。 */
   const 历史项 = existsSync(复盘文件) ? (JSON.parse(readFileSync(复盘文件, "utf-8")).items || []) : [];
   const 合并 = {};
-  for (const it of 历史项) if (it && it.date && !it.verifiable) 合并[it.date] = it;
+  for (const it of 历史项) if (it && it.date) 合并[it.date] = it;
   for (const it of items) if (it && it.date) 合并[it.date] = it;
-  const 全部项 = Object.values(合并).sort((a, b) => (a.date < b.date ? -1 : 1));
+  /* 与 recs.json 对齐：只保留近 180 天（再多也只是无限膨胀，且超出统计窗口无用） */
+  const 今日键 = new Date().toLocaleString("sv-SE").slice(0, 10).replace(/-/g, "");
+  const 保留界 = 日期键偏移(今日键, -180);
+  const 全部项 = Object.values(合并)
+    .filter((x) => x && x.date && x.date >= 保留界)
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
 
   const 参数 = 算优化参数(全部项.filter((x) => x.verifiable));
+
+  /* 6 个月胜率（2026-11-09 老板要求）：窗口 = 今日往前 180 天，
+     与 recs.json 保留窗口同一把尺子，避免「存档 180 天、统计另一套窗口」的口径漂移。 */
+  const 半年统计 = 区间统计(全部项.filter((x) => x.verifiable && x.date >= 保留界));
+  const 全量统计 = 区间统计(全部项.filter((x) => x.verifiable));
+  参数.half_year = { 窗口起: 保留界, 窗口止: 今日键, ...半年统计 };
+  参数.all_time = 全量统计;
 
   const 复盘包 = { ok: true, updated: new Date().toLocaleString("sv-SE").replace("T", " "), count: 全部项.length, items: 全部项 };
   /* 防空定稿覆盖（2026-10-15 事故：fields 参数整批报错 → 全部期「次日尚未发生」→ 0 期可验证
@@ -396,6 +486,36 @@ async function 主流程() {
   md += 线(`- 急涨失败率（近5日涨幅≥30% 后失败）：${st.急涨失败率 == null ? "—" : (Math.round(st.急涨失败率 * 100) + "%")}`);
   md += 线(`- 平均失败跌幅：**${st.平均失败跌幅 == null ? "—" : st.平均失败跌幅 + "%"}**`);
   md += 线("");
+
+  /* ── 近 6 个月胜率（2026-11-09 老板要求）──
+     口径：推荐日 14:50 按收盘价买入，持有到对应周期收盘，收盘价高于买入价即算胜。
+     T+1 与上面「滚动成功率」同源，可直接对照；T+3 / T+5 更贴近「持股 1~4 周」的真实兑现。 */
+  const hy = 参数.half_year;
+  md += 线("## 近 6 个月胜率（窗口 " + hy.窗口起 + " → " + hy.窗口止 + "）");
+  md += 线(`- 样本：**${hy.期数}** 期 · **${hy.样本票数}** 只（仅计已到下一交易日的票，停牌不参与）`);
+  if (hy.样本票数) {
+    md += 线("");
+    md += 线("| 持有周期 | 样本 | 胜 | 胜率 | 平均收益 |");
+    md += 线("|---|---|---|---|---|");
+    for (const [名, 键] of [["次日收盘 T+1", "T1"], ["3 日收盘 T+3", "T3"], ["5 日收盘 T+5", "T5"]]) {
+      const s = hy[键];
+      md += 线(`| ${名} | ${s.样本} | ${s.胜} | **${s.胜率 == null ? "—" : s.胜率 + "%"}** | ${s.均值 == null ? "—" : (s.均值 > 0 ? "+" : "") + s.均值 + "%"} |`);
+    }
+    md += 线("");
+    md += 线("**分档对比（S 级 = 双金共振最高等级，A 级 = 常规）**");
+    md += 线("");
+    md += 线("| 档位 | 样本 | T+1 胜率 | T+1 均收 | T+5 胜率 | T+5 均收 |");
+    md += 线("|---|---|---|---|---|---|");
+    for (const [名, d] of [["S 级", hy.S级], ["A 级", hy.A级]]) {
+      md += 线(`| ${名} | ${d.样本} | ${d.T1.胜率 == null ? "—" : d.T1.胜率 + "%"} | ${d.T1.均值 == null ? "—" : (d.T1.均值 > 0 ? "+" : "") + d.T1.均值 + "%"} | ${d.T5.胜率 == null ? "—" : d.T5.胜率 + "%"} | ${d.T5.均值 == null ? "—" : (d.T5.均值 > 0 ? "+" : "") + d.T5.均值 + "%"} |`);
+    }
+    md += 线("");
+    md += 线(`> 读法：S 级 T+1 胜率若长期低于 A 级，说明「双金共振」在实际兑现上不如常规形态，`);
+    md += 线(`> 处置顺序是收紧周线 KDJ 低位阈值或日线聚合阈值，**不要**恢复周线均线硬拦截（那会直接选不出票）。`);
+  } else {
+    md += 线("- 窗口内暂无已到次日的样本，随每日荐股与复盘自动累积。");
+  }
+  md += 线("");
   md += 线("## 本轮优化后的引擎参数（engine.js 将读取）");
   const cg = 参数.cfg;
   md += 线(`- 追高上限：**已删除**（2026-11-06 起当日涨幅不再设硬门槛）`);
@@ -404,14 +524,22 @@ async function 主流程() {
   md += 线(`- 急涨上限（近5日累计涨幅≥此值剔除，90度斜率）：**${cg.急涨上限}%**`);
   md += 线(`- 统一止损率：**${Math.round((1 - cg.止损率) * 100)}%**（buyPrice × ${cg.止损率}）`);
   md += 线("");
-  md += 线("## 各期明细");
-  for (const it of 全部项) {
+  /* 明细只输出最近 30 期：6 个月约 120 期，全量罗列会让报告长到没法读，
+     汇总统计已在上面给出，明细仅作近期核对用。 */
+  md += 线("## 各期明细（最近 30 期）");
+  md += 线(`> 完整 ${全部项.length} 期明细见 review_log.json（保留近 180 天）。`);
+  md += 线("");
+  for (const it of 全部项.slice(-30)) {
     if (!it.verifiable) { md += 线(`- **${it.date}**：尚未到次日，待验证`); continue; }
     const ok = it.picks.filter((p) => p.ret != null && p.ret > 0).length;
     const tot = it.picks.filter((p) => p.ret != null).length;
     md += 线(`- **${it.date}** 荐股 → **${it.持股日 || "—"}** 持股（大盘 ${it.market_chg == null ? "—" : it.market_chg + "%"}）：${ok}/${tot} 胜`);
     for (const p of it.picks) {
       const 涨跌 = p.ret == null ? "—" : (p.ret > 0 ? "🔺" + p.ret + "%" : "🔻" + p.ret + "%");
+      const 多周 = [
+        p.ret3 != null ? "T+3 " + (p.ret3 > 0 ? "+" : "") + p.ret3 + "%" : null,
+        p.ret5 != null ? "T+5 " + (p.ret5 > 0 ? "+" : "") + p.ret5 + "%" : null,
+      ].filter(Boolean).join(" / ");
       const 持股日因 = p.ret != null && p.ret < 0 ? (() => {
         const 因 = [];
         if (p.持大盘 != null && p.持大盘 < 0) 因.push("弱市");
@@ -434,12 +562,15 @@ async function 主流程() {
         }
         return "｜持股日归因：" + 因.join("+");
       })() : "";
-      md += 线(`   - ${p.name}(${p.code}) 次日收盘 ${涨跌}${持股日因}｜推荐日涨幅 ${p.chg == null ? "—" : p.chg + "%"}`);
+      const 等级 = p.tier === "S" ? "S" : "A";
+      md += 线(`   - [${等级}] ${p.name}(${p.code}) 次日收盘 ${涨跌}${多周 ? "（" + 多周 + "）" : ""}${持股日因}｜推荐日涨幅 ${p.chg == null ? "—" : p.chg + "%"}`);
     }
   }
   writeFileSync(报告文件, md, "utf-8");
 
   console.log(`✅ 复盘完成：${全部项.filter((x) => x.verifiable).length} 期可验证，滚动成功率 ${st.成功率 == null ? "—" : st.成功率 + "%"}`);
+  const hys = 参数.half_year;
+  console.log(`   近 6 个月（${hys.窗口起}→${hys.窗口止}）：${hys.期数} 期 / ${hys.样本票数} 只 · T+1 ${hys.T1.胜率 == null ? "—" : hys.T1.胜率 + "%"} · T+5 ${hys.T5.胜率 == null ? "—" : hys.T5.胜率 + "%"} · S 级 ${hys.S级.样本} 只（T+1 ${hys.S级.T1.胜率 == null ? "—" : hys.S级.T1.胜率 + "%"}）/ A 级 ${hys.A级.样本} 只（T+1 ${hys.A级.T1.胜率 == null ? "—" : hys.A级.T1.胜率 + "%"}）`);
   console.log(`   产出 ${复盘文件} / ${参数文件} / ${报告文件}`);
 }
 
