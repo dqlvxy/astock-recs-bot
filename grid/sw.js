@@ -1,6 +1,6 @@
 /* A股工具集 Service Worker —— 网络优先，离线回退缓存
    目的：满足 PWA 可安装条件（含 fetch 处理器），使「添加到主屏幕」进入 standalone 全屏 */
-const 缓存名 = "astock-static-v5";
+const 缓存名 = "astock-static-v6";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
