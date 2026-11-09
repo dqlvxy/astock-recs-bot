@@ -17,6 +17,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: 列出账户里的 Pages 项目
+        run: npx --yes wrangler@4.158.0 pages project list
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
       - name: 部署到 Cloudflare Pages
         run: npx --yes wrangler@4.158.0 pages deploy . --project-name=agent-hub-mcp --branch=main
         env:
