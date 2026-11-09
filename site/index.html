@@ -3838,8 +3838,16 @@ function renderTodayHold(recs){
     return 取建仓价(推荐日, x.code) != null || x.买入价 != null || x.buy_price != null || x.price != null || x.today_price != null;
   });
   var 行='';
-  /* 按等级从高到低排序：一等(1)排最前，七等(7)排最后 */
-  var 排序后 = picks.slice().sort(function(a,b){ return (a.r||99) - (b.r||99); });
+  /* 按等级从高到低排序：一等(1)排最前，七等(7)排最后。
+     等级一律走 等级信息() 解析（buy_rank / 买点等级 / buy_type 反推 / tier 兜底），
+     不能再直接读 a.r——云端 recs.json 的 pick 里没有 r 字段，读了全是 undefined，等于没排。
+     缺等级或解析不出的排最后；同等级按形态分高者在前。 */
+  function 等级序(x){ var g = 等级信息(x); return g ? g.序 : 99; }
+  var 排序后 = picks.slice().sort(function(a,b){
+    var 差 = 等级序(a) - 等级序(b);
+    if(差) return 差;
+    return (Number(b && b.score) || 0) - (Number(a && a.score) || 0);
+  });
   排序后.slice(0,6).forEach(function(x){
     var q=quoteCache[bcode(x.code)];
     var 现价=q&&q.price!=null?q.price:(x.today_price!=null?x.today_price:(x.price!=null?x.price:null));
@@ -3948,7 +3956,8 @@ function renderTodayHold(recs){
     }
     var 行们 = 根.querySelectorAll(".th-row:not(.th-headrow)");
     行们.forEach(function(r, i){
-      var x = picks[i]; if(!x) return;
+      /* 必须取排序后的数组：取 picks[i] 会把排序后的第 i 行文本错配到原来的第 i 只票 */
+      var x = 排序后[i]; if(!x) return;
       var q = quoteCache[bcode(x.code)];
       var 现价 = q&&q.price!=null ? q.price : (x.today_price!=null?x.today_price:(x.price!=null?x.price:null));
       var 建 = 取建仓价(推荐日, x.code);
@@ -11084,7 +11093,7 @@ document.getElementById("dlBtn").setAttribute("aria-label", "装到手机桌面"
    ?v=20 是版本闸：前端结构性改动后必须同步 +1，浏览器才会判定为「新 SW」→ 重装 →
    skipWaiting + clients.claim + 清空旧缓存，手机端不会继续跑改动前的旧页面。 */
 if ("serviceWorker" in navigator && location.protocol === "https:"){
-  navigator.serviceWorker.register("./sw.js?v=28", { updateViaCache: "none" }).then(function(reg){
+  navigator.serviceWorker.register("./sw.js?v=29", { updateViaCache: "none" }).then(function(reg){
     try { reg.update(); } catch (e) {}
   }).catch(function(){});
 }
