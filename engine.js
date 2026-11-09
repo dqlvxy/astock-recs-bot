@@ -1138,7 +1138,7 @@ async function runStable(prog, 已推码集) {
     dtN = A[2],
     zbMap = A[3];
   const zbN = Object.keys(zbMap).length;
-  P(24, "扫描全市场（沪深主板）…");
+  P(24, "扫描全市场（沪深主板 + 创业板，科创/北交已排除）…");
   let all;
   try {
     all = await 拉全市场();
