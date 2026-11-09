@@ -574,6 +574,12 @@ function scan(cands, ztCodes) {
        市值不再是选股条件，仅作为归档字段随推荐输出。 */
     if (price > 60) continue; // 股价 <= 60（用户放宽）
     if (code.startsWith("688")) continue; // 排除科创板（用户要求，仅留沪深主板+创业）
+    /* 2026-11-09 11:53：北交所显式剔除（老板要求）。
+       代码段本身只覆盖 sh600000-605999 与 sz000000-301999，实测全市场 4950 只里北交所 0 命中，
+       本不该出现；这里补一道显式防线，防止日后扩代码段时误把北交所带进来
+       ——北交所涨跌幅 30%、流动性口径与主板不同，混入会污染涨停线判定与温度统计。
+       覆盖三种写法：bj 前缀、4 开头（430xxx）、8 开头（83x-87x）、920 新段。 */
+    if (String(r.全码 || "").startsWith("bj") || /^(8|4)/.test(code) || code.startsWith("920")) continue;
     if (name.indexOf("ST") >= 0 || name.indexOf("*") >= 0 || name.indexOf("N") === 0 || name.indexOf("退") >= 0) continue;
     if (zs[code]) continue; // 涨停封死买不进
     out.push({
