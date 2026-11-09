@@ -528,8 +528,13 @@ function scan(cands, ztCodes) {
     /* 涨幅只作「可买性」约束：≥ 涨停线剔除（封死涨停的票尾盘买不到）。
        「当日必须红盘」（涨幅 > 0）已于 2026-11-06 按老板要求删除；
        追高上限（涨幅硬上限）亦已于同日删除。
-       现在当日红绿盘不影响入池，选股只看量价与均线形态。 */
-    if (chg >= 9.8) continue;
+       现在当日红绿盘不影响入池，选股只看量价与均线形态。
+       2026-11-09：改为按板块取线——主板涨停 9.8%、创业板 19.8%（科创 688 上面已整段排除），
+       剔除「涨停线 − 0.3」以上的票（主板 9.5% / 创业板 19.5%）。
+       原来那条无条件 `chg >= 9.5` 会把创业板 9.5%~19.5% 未封板的强势票整段误杀，
+       连带把 B6 强势延续在创业板上的样本砍掉一半。 */
+    const 涨停线 = code.charAt(0) === "3" ? 19.8 : 9.8;
+    if (chg >= 涨停线 - 0.3) continue;
     /* 2026-10-16：量比/换手同追高一样从初筛移到 hardFilter 精判 ——
        强势延续票（昨涨停+今续强）天然高量比高换手，被初筛区间挡在门外
        （实测：皇台酒业换手 25% 超上限；新华文轩量比盘中飙升）。初筛只留宽松边界。 */
@@ -540,7 +545,6 @@ function scan(cands, ztCodes) {
     if (code.startsWith("688")) continue; // 排除科创板（用户要求，仅留沪深主板+创业）
     if (name.indexOf("ST") >= 0 || name.indexOf("*") >= 0 || name.indexOf("N") === 0 || name.indexOf("退") >= 0) continue;
     if (zs[code]) continue; // 涨停封死买不进
-    if (chg >= 9.5) continue; // 未涨停（主板）
     out.push({
       code,
       name,
@@ -662,7 +666,11 @@ function 背离判定(closes, mc, 窗) {
    0~2% 0.00%、2~5% -0.68%、<-5%（深回踩）-1.54%。原条件（回调窗口 10 日、不限今日幅度）
    把深回踩与中继整理全放进来，且成交额/形态叠加后从未触发。现收窄为：
    回调窗口 ≤2 日 + 今日回踩幅度限定 [回调回踩下限, 回调回踩上限]。 */
-function detect涨停回调(rows, closes, ma10) {
+function detect涨停回调(rows, closes, ma10, code) {
+  /* 2026-11-09：涨停判定改为按板块取线（主板 9.8% / 创业板 19.8%），
+     原来硬编码 0.098 会把创业板涨 10% 的普通大阳误判成涨停，
+     B3 的「昨日涨停→今日回踩」样本因此长期掺水。 */
+  const 涨停线 = (String(code || "").charAt(0) === "3" || String(code || "").startsWith("688") ? 0.198 : 0.098);
   const n = closes.length;
   if (n < 12 || ma10 == null) return null;
   const last = closes[n - 1];
@@ -676,7 +684,7 @@ function detect涨停回调(rows, closes, ma10) {
   for (let i = n - 2; i >= Math.max(1, n - 3); i--) {
     const 收 = closes[i],
       昨 = closes[i - 1];
-    if (昨 > 0 && (收 - 昨) / 昨 >= 0.098) {
+    if (昨 > 0 && (收 - 昨) / 昨 >= 涨停线 * 0.98) {
       涨停序 = i;
       break;
     }
@@ -901,7 +909,7 @@ function hardFilter(pool, klineMap) {
     const 红柱 = !!(mc && mc.dif > mc.dea && mc.hist > 0);
     // MACD 红柱必须处于「加长阶段」：当前红柱 > 前一根红柱（动能增强）；缩短阶段剔除，避免强弩之末
     const 红柱加长 = !!(红柱 && mc.histPrev != null && mc.hist > mc.histPrev);
-    const 涨停回调 = detect涨停回调(rows, closes, ma10);
+    const 涨停回调 = detect涨停回调(rows, closes, ma10, p.code);
     /* 量比/换手精判（2026-10-16 从初筛移入）：非强势延续票仍按自适应区间剔除，强势延续票豁免 */
     if (!强势延续) {
       if (p.vr == null || p.vr < CFG.量比下限 || p.vr > CFG.量比上限) { 统计.量比剔除++; continue; }
