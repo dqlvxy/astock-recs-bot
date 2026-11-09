@@ -128,7 +128,7 @@ git add -A && git commit -m "feat(site): 逐日明细加均涨列" && git push o
 | 项 | 值 |
 |---|---|
 | 类型 | HTTP（Streamable HTTP） |
-| URL | `https://astock-mcp.pages.dev/mcp` |
+| URL | `https://astock-mcp.pages.dev/api/mcp` |
 | Header | `Authorization: Bearer <MCP_TOKEN>` |
 
 口令单独发给用户，**不写进对话以外的任何文件**。装好后豆包就能直接 `read_file` / `write_file` / `delete_file`，不再依赖 raw 链接。
@@ -191,7 +191,7 @@ WorkBuddy 负责：`git pull` → 自检 → 部署 → 回填台账的「线上
 | 2 | `grid/` 入库 | ✔ 7 个文件，168KB |
 | 3 | 三份 collab 文档入库 | ✔ 仓库根 |
 | 4 | `site/运维手册.md` 脱敏 | ✔ 无明文令牌（扫描 `cfut_` / `ghp_` / `github_pat_` 零命中） |
-| 5 | MCP 服务器上线 | ✔ `astock-mcp.pages.dev`，8 个工具，写删已实测 |
+| 5 | MCP 服务器上线 | ✔ `astock-mcp.pages.dev/api/mcp`，12 个工具（含 `actions_list` / `actions_get` 两个 Actions 只读），写删已实测 |
 | 7 | push 自动部署 | ⏳ 待开启，见 `四端同步_开启自动部署.md` |
 
 新设备接入只需两步：`git clone https://github.com/dqlvxy/astock-recs-bot`，然后读 `collab-entry.md`。
