@@ -1,0 +1,19 @@
+# Cloudflare Pages 响应头
+# 目的：看板是「云端改完即生效」的形态，HTML 与 Service Worker 绝不能落到端侧缓存，
+#       否则手机 PWA 会长时间显示改动前的旧页面（2026-11-06 财经快讯删除不生效即此原因）。
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+
+/
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+
+/index.html
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+
+/sw.js
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+
+/manifest-board.json
+  Cache-Control: no-cache, must-revalidate, max-age=0
