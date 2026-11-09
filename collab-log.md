@@ -18,6 +18,7 @@
 
 | 时间 | 设备 | 文件 | 改动内容 | commit | 线上版本 | 自检 |
 |---|---|---|---|---|---|---|
+| 2026-11-10 01:34 | 手机豆包 | `site/index.html`、`site/sw.js` | 持仓荐股等级排序修复：上一版排序读 `a.r`，但 recs.json 的 pick 无此字段、全部落到 99，等于没排；改为 `等级信息().序` 作第一主键（buy_rank / 买点等级 / buy_type 反推 / tier 兜底），同等级按形态分降序、未标级排最后；原地更新路径由 `picks[i]` 改为 `排序后[i]`，避免文本错配；缓存 sw 28→29 | 4fc87b3 | sw v29 | `new Function` 编译 renderTodayHold 通过；6 只样例实测排序 一等>二等>六等>七等>未标级 |
 | 2026-11-09 23:32 | 手机豆包 | `collab-rules.md` | 第六节步骤 1 的端点拆成 A（`astock-file-mcp.pages.dev/mcp`，8 个文件工具）/ B（`astock-mcp.pages.dev/api/mcp`，12 个功能），并注明文件工具只在 A、B 的 `file_list` 返回空属正常；初始化 #5 由「12 个工具」改为 A/B 双服务对照；初始化 #7「push 自动部署 ⏳ 待开启」改为 ✔ 已开启（`deploy.yml` `8917f6c`，最近三次 run 均 success） | 983c3e9 | — | 读回复核 12232 B，3 处旧表述均已不存在；Actions total 仍 127，未误触发部署 |
 
 | 2026-11-09 23:11 | 手机豆包 | `collab-entry.md` | 6.1 拆成服务 A（`astock-file-mcp.pages.dev/mcp`，8 工具）/ 服务 B（`astock-mcp.pages.dev/api/mcp`，12 功能）两条服务表；6.2 由「十二个工具」改为「A 8 个 + B 12 个功能」两张表；删掉「`/api/mcp` 下有 `write_file`」的错配，补「B 的 `file_list` 查中枢索引、返回空属正常」说明 | 845694d | — | GitHub Contents API 读回复核：10658 B，A/B 两端点俱在，「十二个工具」表述已不存在 |
