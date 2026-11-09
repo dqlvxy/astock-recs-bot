@@ -3838,7 +3838,9 @@ function renderTodayHold(recs){
     return 取建仓价(推荐日, x.code) != null || x.买入价 != null || x.buy_price != null || x.price != null || x.today_price != null;
   });
   var 行='';
-  picks.slice(0,6).forEach(function(x){
+  /* 按等级从高到低排序：一等(1)排最前，七等(7)排最后 */
+  var 排序后 = picks.slice().sort(function(a,b){ return (a.r||99) - (b.r||99); });
+  排序后.slice(0,6).forEach(function(x){
     var q=quoteCache[bcode(x.code)];
     var 现价=q&&q.price!=null?q.price:(x.today_price!=null?x.today_price:(x.price!=null?x.price:null));
     /* 成本基准优先级：14:50 建仓快照（真实成交口径，老板指令）→ 推荐记录自带买入价（策略建仓点）→ 现价兜底。
@@ -3902,7 +3904,7 @@ function renderTodayHold(recs){
     +'</div>';
   /* 防闪屏（铁律一）：结构签名不变时只原地更新文本，不重建 DOM */
   var 结构签 = picks.length + "|" + (vs条 ? 1 : 0) + "|" + (有成本 ? 1 : 0) + "|" +
-    picks.slice(0,6).map(function(x){ return x.code; }).join(",");
+    排序后.slice(0,6).map(function(x){ return x.code; }).join(",");
   var 首建 = (renderTodayHold._签 !== 结构签);
   if(首建){
     renderTodayHold._签 = 结构签;
