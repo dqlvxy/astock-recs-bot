@@ -1,0 +1,24 @@
+name: 部署 agent-hub（汉化版·临时流水线）
+
+"on":
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取 agent-hub-mcp
+        uses: actions/checkout@v4
+        with:
+          repository: dqlvxy/agent-hub-mcp
+          ref: main
+          token: ${{ secrets.DEPLOY_PAT }}
+      - name: 准备 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 部署到 Cloudflare Pages
+        run: npx --yes wrangler@4.158.0 pages deploy . --project-name=agent-hub-mcp --branch=main
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
