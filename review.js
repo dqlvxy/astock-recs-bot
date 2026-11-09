@@ -359,10 +359,18 @@ function 账户模拟(期列表, opt = {}) {
 
     for (const p of 票) {
       const 价 = p.买价 > 0 ? p.买价 : (p.price > 0 ? p.price : null);
-      if (!(价 > 0)) { 无价笔++; continue; }
-      const 股 = 算股数(单只预算, 价);
-      if (!股) { 买不起++; continue; }
-      const 买 = 股 * 价;
+      /* 无买价兜底（2026-11-09）：按整额预算买入，不让这笔交易从账上凭空消失 ——
+         跳过会让账户少算一次真实盈亏，收益率被系统性扭曲。
+         正常情况 无价笔 = 0（recs.json 的 price 一直有），这条只是防线上云后失效。 */
+      let 股 = 0, 买 = 0;
+      if (价 > 0) {
+        股 = 算股数(单只预算, 价);
+        if (!股) { 买不起++; continue; }
+        买 = 股 * 价;
+      } else {
+        无价笔++;
+        买 = 单只预算;
+      }
       const 卖 = 买 * (1 + p.ret / 100);
       const 佣 = 佣金买 + 佣金卖;
       const 印 = 卖 * 印花税率;
@@ -572,7 +580,13 @@ async function 主流程() {
        必然撞上 Actions 20 分钟超时。已复盘且多周期已算满（T+5 已发生）的期直接复用旧结果，
        每天只真正计算新期与最近 5 个交易日内的期。 */
     const 旧 = done[g.date];
-    if (旧 && 旧.verifiable && 旧.多周期 && (旧.picks || []).some((p) => p && p.ret5 != null)) { items.push(旧); continue; }
+    /* 复用条件必须包含「买价齐」（2026-11-09 修）：账户模拟要按 14:50 现价整手取整，
+       若某期缓存是买价字段上线前写的（picks 里没有 买价），直接复用会让云端账户模拟
+       永久按整 1 万算、永远算错，且不会自愈（本地是靠手动删 review_log.json 才补上的）。
+       这里强制重算一次；重算仍拿不到买价就打 买价缺 标记，避免每次复盘都白跑。 */
+    const 买价齐 = (旧 && (旧.picks || []).every((p) => p && (p.买价 > 0 || p.买价缺)));
+    if (旧 && 旧.verifiable && 旧.多周期 && 买价齐 && (旧.picks || []).some((p) => p && p.ret5 != null)) { items.push(旧); continue; }
+    if (旧 && 旧.verifiable && !买价齐) console.log(`  期 ${g.date}: 缓存缺买价，强制重算（账户模拟整手取整需要）`);
     const 期 = { date: g.date, gen_time: g.gen_time || "", picks: [], verifiable: false, market_chg: null, 荐日大盘: null, 持股日: null, success: null, 多周期: 1 };
     const picks = g.picks || [];
     if (!picks.length) continue;
@@ -602,8 +616,10 @@ async function 主流程() {
         ret: ret != null ? Math.round(ret * 100) / 100 : null,
         ret3: 多.ret3, ret5: 多.ret5,   // 6 个月胜率的多周期口径（见 区间统计）
         /* 买入价：优先 recs 里 14:50 的现价 p.price，缺失时用荐股日收盘价。
-           账户模拟按它算整手股数（100 股整数倍、金额 ≤1 万）。 */
+           账户模拟按它算整手股数（100 股整数倍、金额 ≤1 万）。
+           两处都拿不到时打 买价缺 标记 —— 让增量复用不再反复重算这一期。 */
         买价: p.price > 0 ? p.price : (多.买入价 > 0 ? 多.买入价 : null),
+        ...((p.price > 0 || 多.买入价 > 0) ? {} : { 买价缺: 1 }),
         // 持股日解剖（归因重锚：全部字段锚定持股日 = 荐股日 14:50 买入后的第一个交易日）
         ...(持股日解剖(p.code, kl, g.date, 大盘日K) || {}),
       };
