@@ -3843,11 +3843,7 @@ function renderTodayHold(recs){
      不能再直接读 a.r——云端 recs.json 的 pick 里没有 r 字段，读了全是 undefined，等于没排。
      缺等级或解析不出的排最后；同等级按形态分高者在前。 */
   function 等级序(x){ var g = 等级信息(x); return g ? g.序 : 99; }
-  var 排序后 = picks.slice().sort(function(a,b){
-    var 差 = 等级序(a) - 等级序(b);
-    if(差) return 差;
-    return (Number(b && b.score) || 0) - (Number(a && a.score) || 0);
-  });
+  var 排序后 = 按等级排荐股(picks);   /* 统一走等级由高到低 */
   排序后.slice(0,6).forEach(function(x){
     var q=quoteCache[bcode(x.code)];
     var 现价=q&&q.price!=null?q.price:(x.today_price!=null?x.today_price:(x.price!=null?x.price:null));
@@ -4721,6 +4717,39 @@ function 取今日快照(){
 
 
 
+
+/* ============================================================
+ * 荐股顺序 · 按买点等级由高到低（2026-11-10 就地修正）
+ * ------------------------------------------------------------
+ * 口径（与云端《工作准则》第四节、与 recs.json 完全一致）：
+ *   买点等级 一等→七等  →  tier S→A  →  prob 降序  →  score 降序  →  稳定保持原序
+ * 等级一律复用本文件自带的 等级信息()（buy_rank / 买点等级 / buy_type 反推 / tier 兜底），
+ * 不另造等级体系；缺等级、解析不出的排最后。
+ * 注入点选在「合并十日荐股」唯一出口：云端存档 / 内嵌快照 / 持仓预热 /
+ * 同步码等所有来源都汇聚于此，改一处即使「今日持股、十日荐股、复盘、
+ * 次日视图、同步码导出」全部按高→低显示，且不受 CDN 缓存、定稿冻结影响。
+ * ============================================================ */
+function 按等级排荐股(picks){
+  if(!Array.isArray(picks)) return picks;
+  var n = function(v){ var x = Number(v); return isFinite(x) ? x : 0; };
+  var g = function(p){
+    var d = (typeof 等级信息 === "function") ? 等级信息(p) : null;
+    return (d && d.序) ? d.序 : 99;
+  };
+  var t = function(p){
+    var v = (p || {}).tier;
+    return v === "S" ? 0 : (v === "A" ? 1 : 2);
+  };
+  return picks.map(function(p, i){ return { p:p, i:i }; }).sort(function(a, b){
+    var A = a.p || {}, B = b.p || {};
+    if(g(A) !== g(B)) return g(A) - g(B);
+    if(t(A) !== t(B)) return t(A) - t(B);
+    if(n(B.prob) !== n(A.prob)) return n(B.prob) - n(A.prob);
+    if(n(B.score) !== n(A.score)) return n(B.score) - n(A.score);
+    return a.i - b.i;                    /* 完全同档：保持原顺序，稳定排序 */
+  }).map(function(x){ return x.p; });
+}
+
 function 合并十日荐股(){
   var 全 = {};
   /* 日期归一：把「20261008」与「2026-10-08」统一成 YYYY-MM-DD，避免格式不一致导致同日判断失效 */
@@ -4766,6 +4795,8 @@ function 合并十日荐股(){
   }catch(e){}
   var 列表 = Object.keys(全).map(function(k){ return 全[k]; })
     .sort(function(a,b){ return a.date < b.date ? -1 : 1; });
+  /* 荐股顺序：每期内部按买点等级由高到低（一处覆盖全部来源与下游） */
+  列表.forEach(function(g){ if(g && Array.isArray(g.picks)) g.picks = 按等级排荐股(g.picks); });
   return 列表.length > 10 ? 列表.slice(-10) : 列表;
 }
 
