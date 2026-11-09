@@ -322,8 +322,8 @@ export async function onRequestPost(context) {
   const { request, env } = context;
 
   // 鉴权
-  const auth = request.headers.get("Authorization") || "";
-  const token = auth.replace(/^Bearer\s+/i, "");
+  const bearer = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+  const token = bearer || request.headers.get("x-mcp-token") || "";
   if (token !== env.MCP_TOKEN) {
     return new Response(JSON.stringify(jsonrpcErr(null, -32001, "unauthorized")), {
       status: 401,
