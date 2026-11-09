@@ -172,18 +172,15 @@ async function main() {
      （定时版一心堂 / 补跑版金域医学），看板「今日持股」显示了用户并未实购的股票。
      老板的流程是「14:30 荐股定稿 → 14:50 买入 → 次日涨了卖」，
      故当日一旦有存档，它就是操作依据，后续任何触发都不得覆盖。
-     需要强制重算时设 FORCE=1（workflow_dispatch 勾选 force）。 */
-  const 强制重算 = /^(1|true)$/i.test(String(process.env.FORCE || "").trim());
+     2026-11-09：手动触发入口与 FORCE 覆盖参数已删除，本冻结是唯一防线，
+     不存在任何绕过路径。 */
   const 今日已有 = (Array.isArray(历史) ? 历史 : []).find((g) => g && g.date === 今日);
-  if (今日已有 && !强制重算) {
+  if (今日已有) {
     console.log(
       `⏸ 今日 ${今日} 已有定稿（gen_time=${今日已有.gen_time || "?"}，` +
-        `${(今日已有.picks || []).length} 只），跳过重算以保持定稿不变（强制重算请设 FORCE=1）`
+        `${(今日已有.picks || []).length} 只），跳过重算以保持定稿不变`
     );
     return;
-  }
-  if (今日已有 && 强制重算) {
-    console.log(`⚠️ FORCE=1 强制重算：将覆盖今日已有定稿（gen_time=${今日已有.gen_time || "?"}）`);
   }
 
   const 已推码集 = 组装近3期已推码(历史, 今日, 是周末, 是休市日);
