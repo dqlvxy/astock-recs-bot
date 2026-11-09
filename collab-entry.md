@@ -33,7 +33,7 @@ astock-recs-bot/                仓库根
 ├── yaogu.js           12KB    妖股/异动辅助
 ├── test/                      引擎与账户模拟回归测试
 ├── scripts/提交产物.sh        5 轮重试推送脚本（CI 调用，中文名例外，不动）
-├── .github/workflows/         daily.yml（5 档 cron）/ review.yml（15:30）/ deploy.yml（site/、grid/ push 自动部署）
+├── .github/workflows/         daily.yml（5 档 cron）/ review.yml（15:30）
 ├── site/                      ② 看板
 │   ├── index.html     720KB   单文件，全部 UI 与逻辑
 │   ├── sw.js                  缓存版本闸，改 HTML 必须与 ?v=N 同步 +1
@@ -53,8 +53,7 @@ astock-recs-bot/                仓库根
 
 | 项 | 值 |
 |---|---|
-| 最新 commit | `8d3a63b`（2026-11-09 20:50，开启 push 自动部署并回填台账） |
-| 前端部署 | **已开启，四端 push 即上线**：`deploy.yml`（`8917f6c`），推送 `site/` 或 `grid/` 后 Actions 约 1–2 分钟自动部署到 Cloudflare Pages；手动 run 与 push 触发均已实测两步骤全绿 |
+| 最新 commit | `2b7b74c`（2026-11-09 16:10，site/ 与 grid/ 入库，四端协作 v3.0） |
 | 看板缓存版本 | `sw.js` v27（`index.html` 内 `sw.js?v=27`） |
 | 网格缓存版本 | v6 |
 | 荐股存档期数 | 22 期（最后一期 20261109，5 只） |
@@ -71,9 +70,9 @@ astock-recs-bot/                仓库根
 | 电脑端豆包 | ✔ | ✔ | ✔ | 自动 | ✘ |
 | 手机端豆包 | ✔ | ✔ | ✔ | 自动 | ✘ |
 
-**部署：已开启，四端 push 即上线**（2026-11-09 20:50，见 `collab-log.md` 变更记录）：
-- 四端改完 `site/` 或 `grid/` 推送到 main 后，GitHub Actions「部署前端到 Cloudflare Pages」约 1–2 分钟自动上线，谁改都一样，无需再请 WorkBuddy 手工 `wrangler pages deploy`。
-- 凭据走仓库 Secrets `CF_ACCOUNT_ID` / `CF_API_TOKEN`；`daily.yml` 与 `review.yml` 未改动，荐股与复盘流程不受影响。
+**部署分两种情况**（见 `四端同步_开启自动部署.md`）：
+- 自动部署已开启：四端改完 `site/` 或 `grid/` 推送后，GitHub Actions 约 1–2 分钟自动上线，谁改都一样。
+- 尚未开启：部署仍由电脑端 WorkBuddy 用 `wrangler pages deploy` 执行，豆包改完要说「请 WorkBuddy 部署」。
 
 **唯一硬差异**：不能改 `.github/workflows/**`（服务端硬拦，普通令牌也拦）。
 
@@ -149,3 +148,9 @@ status  →  list_dir(相关目录)  →  read_file(要改的文件)  →  write
 3. `sw.js` 版本号与 `index.html` 的 `?v=` 必须同步
 4. 统计口径改动必须同时看 `review.js`（后端算）与 `site/index.html`（前端渲染），只改一边会显示错乱
 5. 不许删「当日定稿冻结」（`generate.js`）与「今日定稿闸门」（`daily.yml`）——这是防同一天出两个版本荐股的最后防线
+
+## 九、每轮归档（v3.2 起）
+
+每一轮对话结束后，聊天记录与本轮生成的文件会自动归档到资料库「四端协同 · 产出」文件夹（私有）。
+规则全文《astock · 每轮归档规则》也在同一文件夹。要查历史或拿文件，按日期找对应文档与产物包。
+凭证类信息脱敏后才入库；公开仓库不放聊天原文。发现某轮漏归档，说一句「这轮没归档」即可补做。
