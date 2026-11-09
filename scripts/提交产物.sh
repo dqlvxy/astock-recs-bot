@@ -42,6 +42,10 @@ RETRY_TIMES="${RETRY_TIMES:-5}"
 RETRY_DELAY="${RETRY_DELAY:-6}"
 FILES=("$@")
 
+# 启动横幅：Actions 日志里一眼可辨「脚本确实被调用」。
+# 靠这行区分新旧 workflow —— 旧版内联逻辑不会打印它。
+echo "== 提交产物.sh 启动（待提交：${FILES[*]:-无}）=="
+
 if [ "${#FILES[@]}" -eq 0 ]; then
   echo "::error::未指定要提交的文件（用法：bash scripts/提交产物.sh 文件1 文件2 ...）"
   exit 2
