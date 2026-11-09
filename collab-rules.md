@@ -128,10 +128,12 @@ git add -A && git commit -m "feat(site): 逐日明细加均涨列" && git push o
 | 项 | 值 |
 |---|---|
 | 类型 | HTTP（Streamable HTTP） |
-| URL | `https://astock-mcp.pages.dev/api/mcp` |
+| URL（A 服务 · 文件读写） | `https://astock-file-mcp.pages.dev/mcp` |
+| URL（B 服务 · 协作中枢） | `https://astock-mcp.pages.dev/api/mcp` |
+| 两条都装 | 是，各建一条；两条共用同一口令 |
 | Header | `Authorization: Bearer <MCP_TOKEN>` |
 
-口令单独发给用户，**不写进对话以外的任何文件**。装好后豆包就能直接 `read_file` / `write_file` / `delete_file`，不再依赖 raw 链接。
+口令单独发给用户，**不写进对话以外的任何文件**。`read_file` / `write_file` / `delete_file` 这些文件工具**只在 A 服务上**，装好 A 之后豆包才不再依赖 raw 链接。B 服务只管记账与 Actions 只读，它的 `file_list` 查的是中枢索引、不是仓库目录，返回空属正常。
 
 ### 步骤 2 · 每次新对话先发这段
 
@@ -191,8 +193,8 @@ WorkBuddy 负责：`git pull` → 自检 → 部署 → 回填台账的「线上
 | 2 | `grid/` 入库 | ✔ 7 个文件，168KB |
 | 3 | 三份 collab 文档入库 | ✔ 仓库根 |
 | 4 | `site/运维手册.md` 脱敏 | ✔ 无明文令牌（扫描 `cfut_` / `ghp_` / `github_pat_` 零命中） |
-| 5 | MCP 服务器上线 | ✔ `astock-mcp.pages.dev/api/mcp`，12 个工具（含 `actions_list` / `actions_get` 两个 Actions 只读），写删已实测 |
-| 7 | push 自动部署 | ⏳ 待开启，见 `四端同步_开启自动部署.md` |
+| 5 | MCP 服务器上线（两条并存） | ✔ A `astock-file-mcp.pages.dev/mcp`：8 个文件工具，写 / 读 / 删与三道硬限制已实测；✔ B `astock-mcp.pages.dev/api/mcp`：12 个功能（含 `actions_list` / `actions_get` 两个 Actions 只读），实测拉到 127 次 run。两条共用同一口令 |
+| 7 | push 自动部署 | ✔ 已开启（`.github/workflows/deploy.yml`，`8917f6c`）：任一端推 `site/**` 或 `grid/**` 到 main，约 1–2 分钟后两站自动上线；最近三次 run `42619926352` / `42630073892` / `42630239548` 均 success |
 
 新设备接入只需两步：`git clone https://github.com/dqlvxy/astock-recs-bot`，然后读 `collab-entry.md`。
 
