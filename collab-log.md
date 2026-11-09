@@ -18,6 +18,7 @@
 
 | 时间 | 设备 | 文件 | 改动内容 | commit | 线上版本 | 自检 |
 |---|---|---|---|---|---|---|
+| 2026-11-09 22:15 | 电脑端 | `dqlvxy/agent-hub-mcp` 的 `functions/api/mcp.js`、`collab-entry.md`、`collab-rules.md` | 给豆包开 Actions 只读：新增 `actions_list`（列 workflow run）与 `actions_get`（取作业与每一步结论，附 `failed_steps`），工具数 10→12，中文名「查 Actions 运行」「读 Actions 详情」+ 英文别名双注册；`astock-mcp` 与 `agent-hub-mcp` 两个 Pages 项目均已重新部署（`ed07d2d`）；同时修正文档里 MCP 端点路径 `/mcp`→`/api/mcp`（旧路径实测 404） | `ed07d2d` | astock-mcp / agent-hub-mcp | 线上 tools/list 24 条；本地与线上实测 `actions_list` 拉到真实 run、`actions_get` 返回逐步结论 |
 | 2026-11-09 21:50 | 电脑端 | `.github/workflows/deploy.yml` | 开启 push 自动部署：建 `CF_ACCOUNT_ID` / `CF_API_TOKEN` 两个 Secret + `deploy.yml`（创建 `6777b69`，wrangler 4.158.0 要求 Node≥22 修正为 `8917f6c`）；手动 run 一次 + 临时改 manifest 一个字推一次验证 push 触发（`5aa450c`），改回再推（`8d3a63b`），三次部署均自动跑绿 | `8917f6c` | 看板 sw v27 / 网格 v6 | Actions 全绿，7 项验收通过 |
 | 2026-11-09 21:06 | 手机端 | `collab-rules.md`、`collab-entry.md`、`四端提示词.md` | 建立每轮归档机制：聊天记录与生成文件脱敏后上云到资料库；规程升 v3.2 | 待填 | 资料库 | 脱敏扫描零残留，3 项上传读回通过 |
 | 2026-11-09 20:10 | 手机端 | `grid/index.html`、`grid/sw.js` | 网格从 surge 迁到 Cloudflare Pages（`astock-grid.pages.dev`），线上地址改新域名，缓存 v5→v6 | `1ccccdc` | Pages v6 | 线上 md5 与仓库一致 |
