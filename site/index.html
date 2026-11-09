@@ -4402,7 +4402,7 @@ function 等级徽(x){
   var g = 等级信息(x);
   if(!g) return "";
   var cls = g.序 === 1 ? "tier-s" : "tier-g";
-  return '<i class="' + cls + '" title="' + esc(g.名) + '｜本期选股等级 ' + esc(g.等) + '，按等级优先排序">' + esc(g.等) + '</i>';
+  return '<i class="' + cls + '" title="' + esc(g.名) + '｜本期选股等级 ' + esc(g.等) + '，按等级优先排序">' + esc(g.文) + '</i>';
 }
 function 推荐依据入口(x){
   if(!x) return "";
