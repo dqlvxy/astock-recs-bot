@@ -4731,10 +4731,31 @@ function 取今日快照(){
  * ============================================================ */
 function 按等级排荐股(picks){
   if(!Array.isArray(picks)) return picks;
+  /* 等级解析完全内联（不依赖 等级信息()——该函数在线上页面全局作用域不可见，
+     2026-11-10 实测 typeof 等级信息 === "undefined"，会导致旧补丁把全部票记成 99 而失效）。*/
+  var 等表 = {1:"一等",2:"二等",3:"三等",4:"四等",5:"五等",6:"六等",7:"七等"};
   var n = function(v){ var x = Number(v); return isFinite(x) ? x : 0; };
   var g = function(p){
-    var d = (typeof 等级信息 === "function") ? 等级信息(p) : null;
-    return (d && d.序) ? d.序 : 99;
+    p = p || {};
+    var r = Number(p.buy_rank || 0);
+    if(!r && p.买点等级){
+      for(var k in 等表){ if(等表[k] === String(p.买点等级)){ r = Number(k); break; } }
+    }
+    if(!r && p.等级名){
+      for(var k2 in 等表){ if(等表[k2] === String(p.等级名)){ r = Number(k2); break; } }
+    }
+    if(!r && p.buy_type){
+      var t = String(p.buy_type);
+      if(t.indexOf("双金") >= 0) r = 1;
+      else if(t.indexOf("强势延续") >= 0) r = 2;
+      else if(t.indexOf("底背离") >= 0) r = 3;
+      else if(t.indexOf("金叉") >= 0) r = 4;
+      else if(t.indexOf("涨停回调") >= 0) r = 5;
+      else if(t.indexOf("突破") >= 0) r = 6;
+      else if(t.indexOf("回踩") >= 0) r = 7;
+    }
+    if(!r && (p.tier === "S" || p.最高等级 || p.共振)) r = 1;
+    return (r && 等表[r]) ? r : 99;
   };
   var t = function(p){
     var v = (p || {}).tier;
@@ -4742,11 +4763,11 @@ function 按等级排荐股(picks){
   };
   return picks.map(function(p, i){ return { p:p, i:i }; }).sort(function(a, b){
     var A = a.p || {}, B = b.p || {};
-    if(g(A) !== g(B)) return g(A) - g(B);
-    if(t(A) !== t(B)) return t(A) - t(B);
+    if(g(A) !== g(B)) return g(A) - g(B);        /* 一等→七等 */
+    if(t(A) !== t(B)) return t(A) - t(B);        /* tier S→A */
     if(n(B.prob) !== n(A.prob)) return n(B.prob) - n(A.prob);
     if(n(B.score) !== n(A.score)) return n(B.score) - n(A.score);
-    return a.i - b.i;                    /* 完全同档：保持原顺序，稳定排序 */
+    return a.i - b.i;                            /* 稳定保序 */
   }).map(function(x){ return x.p; });
 }
 
