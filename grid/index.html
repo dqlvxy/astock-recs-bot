@@ -1,0 +1,2069 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#dbe8fb">
+<link rel="manifest" href="./manifest-grid.json">
+<link rel="icon" type="image/svg+xml" href="./icon.svg">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<meta name="application-name" content="网格回测">
+<meta name="apple-mobile-web-app-title" content="网格回测">
+<meta name="description" content="跌买涨卖逆向网格策略回测：行情拉取、逐日模拟、指标汇总与东财条件单参数换算">
+<title>网格交易策略回测工具</title>
+<style>
+  :root{
+    --bg:#f5f7fa; --card:#ffffff; --ink:#1c2333; --ink2:#5a6478; --line:#e3e8f0;
+    --up:#d63a3a; --down:#0e9f6e; --blue:#2563eb; --blue2:#dbeafe; --gold:#b45309;
+    --set:#2563eb; --view:#0e7490;
+    --shadow:0 1px 3px rgba(16,24,40,.08),0 4px 14px rgba(16,24,40,.06);
+    /* ══ 渐变色板：页面底 / 卡片面 / 表头（浓度加大，肉眼可见）══ */
+    --页底一:#dbe8fb; --页底二:#ecdcf9; --页底三:#d6f0e6;
+    --卡面一:#ffffff; --卡面二:#eef3fb;
+    --表头一:#1a4670; --表头二:#2e6ea6;
+  }
+  html[data-theme="dark"]{
+      --bg:#11151c; --card:#1a2029; --ink:#e8ecf3; --ink2:#9aa4b5; --line:#2a3340;
+      --up:#ff6b6b; --down:#2dd4a0; --blue:#5b9dff; --blue2:#1d2a44; --gold:#f0b35c;
+      --set:#5b9dff; --view:#22d3ee;
+      --shadow:0 1px 3px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.35);
+      --页底一:#0d1a2e; --页底二:#1c1030; --页底三:#08201a;
+      --卡面一:#1a2029; --卡面二:#212b3a;
+      --表头一:#15304a; --表头二:#1f4a72;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  /* 页面底：三层明显光晕 + 对角渐变，肉眼一眼可辨 */
+  body{
+    background:var(--bg);
+    background-image:
+      radial-gradient(1200px 700px at 6% -8%, color-mix(in srgb,var(--blue) 42%,transparent), transparent 66%),
+      radial-gradient(1050px 640px at 100% 2%, color-mix(in srgb,#7c3aed 38%,transparent), transparent 64%),
+      radial-gradient(1000px 700px at 44% 106%, color-mix(in srgb,#10b981 32%,transparent), transparent 66%),
+      linear-gradient(160deg, var(--页底一) 0%, var(--页底二) 48%, var(--页底三) 100%);
+    background-attachment:fixed;
+    color:var(--ink); font:14px/1.6 "PingFang SC","Microsoft YaHei",system-ui,sans-serif; padding:18px;
+  }
+  .wrap{max-width:1180px; margin:0 auto; display:flex; flex-direction:column; gap:14px;}
+  /* 卡片：可见的对角渐变 + 顶部高光，保留描边与阴影 */
+  .card{
+    position:relative;
+    background:linear-gradient(155deg, var(--卡面一) 0%, var(--卡面二) 100%);
+    border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); padding:16px 18px;
+  }
+  /* 卡片顶沿一道彩色渐变细线，弱化但不抢眼 */
+  .card::before{
+    content:""; position:absolute; left:0; right:0; top:0; height:2px; border-radius:12px 12px 0 0;
+    background:linear-gradient(90deg,
+      color-mix(in srgb,var(--blue) 70%,transparent),
+      color-mix(in srgb,#7c3aed 60%,transparent) 45%,
+      transparent 90%);
+    opacity:.85; pointer-events:none;
+  }
+  /* 主标题：蓝紫渐变文字，与页面底色呼应 */
+  h1{font-size:20px; display:flex; align-items:center; gap:8px;
+    background:linear-gradient(96deg,#1d4ed8 0%,#2563eb 38%,#7c3aed 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    -webkit-text-fill-color:transparent; width:fit-content;}
+  html[data-theme="dark"] h1{background:linear-gradient(96deg,#7cb0ff 0%,#9d8cff 55%,#c7a6ff 100%);
+    -webkit-background-clip:text; background-clip:text;}
+  h1 .tag{font-size:11px; font-weight:600; color:var(--blue); background:linear-gradient(135deg,
+      color-mix(in srgb,var(--blue) 14%,transparent), color-mix(in srgb,#7c3aed 16%,transparent));
+    border-radius:6px; padding:2px 8px; letter-spacing:1px; -webkit-text-fill-color:currentColor;}
+  .sub{color:var(--ink2); font-size:12px; margin-top:2px;}
+
+  /* ══════════ 顶部标题栏：左标题 / 右按钮组（与看板顶栏一致）══════════ */
+  .标题栏{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:nowrap;}
+  .标题栏 .左{min-width:0; flex:1;}
+  .按钮组{display:flex; gap:8px; flex:none;}
+  .图标钮{width:36px; height:36px; border-radius:12px; border:1px solid var(--line); cursor:pointer;
+    background:var(--card); color:var(--ink); display:flex; align-items:center; justify-content:center;
+    box-shadow:0 1px 3px rgba(16,24,40,.10); transition:transform .15s, background .2s, color .2s, border-color .2s;}
+  .图标钮:hover{background:color-mix(in srgb,var(--blue) 8%,var(--card)); border-color:color-mix(in srgb,var(--blue) 34%,var(--line));}
+  .图标钮:active{transform:scale(.9);}
+  .图标钮 svg{width:18px; height:18px; flex:none; fill:none; stroke:currentColor; stroke-width:2;
+    stroke-linecap:round; stroke-linejoin:round;}
+  /* 自动刷新开启态：绿色高亮 */
+  .图标钮.自动开{color:#4cd964; border-color:color-mix(in srgb,#4cd964 55%,transparent);}
+  .图标钮.自动开 svg{animation:自动转 2.4s ease-in-out infinite;}
+  @keyframes 自动转{0%,100%{transform:rotate(0)}50%{transform:rotate(180deg)}}
+  /* 手动刷新时图标旋转（一次性）*/
+  .图标钮 svg.转{animation:转一圈 .8s linear infinite;}
+  @keyframes 转一圈{to{transform:rotate(360deg);}}
+  /* 状态气泡：点击后在按钮下方短暂提示（与看板 toast 同款） */
+  .主题提示{position:fixed; z-index:999; padding:8px 14px; border-radius:10px; font-size:12.5px; font-weight:700;
+    background:rgba(20,26,38,.94); color:#fff; box-shadow:0 8px 24px rgba(0,0,0,.32); pointer-events:none;
+    opacity:0; transform:translateY(-6px); transition:opacity .2s, transform .2s;}
+  .主题提示.显{opacity:1; transform:translateY(0);}
+
+  /* ══════════ 通用吐司提示（与看板 toast 同款观感）══════════ */
+  #吐司{position:fixed; left:50%; bottom:96px; transform:translateX(-50%); z-index:999; display:none;}
+  #吐司.显{display:block;}
+  .吐司内{display:flex; align-items:center; gap:9px; padding:9px 16px 9px 10px; border-radius:16px;
+    background:var(--card); border:1px solid var(--line); box-shadow:0 12px 32px rgba(16,26,66,.2);
+    position:relative; overflow:hidden; animation:吐司入 .22s ease;}
+  @keyframes 吐司入{from{opacity:0; transform:translateY(10px)}to{opacity:1; transform:translateY(0)}}
+  .吐司内::before{content:""; position:absolute; top:-40px; right:-24px; width:90px; height:90px; border-radius:50%;
+    background:radial-gradient(circle at 32% 30%,color-mix(in srgb,var(--blue) 40%,transparent),transparent 66%);
+    pointer-events:none;}
+  .吐司图{flex:none; width:26px; height:26px; border-radius:9px; display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(135deg,var(--blue),#7c4dff); box-shadow:0 3px 10px color-mix(in srgb,var(--blue) 40%,transparent);
+    position:relative;}
+  .吐司文{font-size:12.5px; font-weight:800; color:var(--ink); position:relative; white-space:nowrap;}
+
+  /* ══════════ 装到手机桌面弹层（与看板同款）══════════ */
+  .安装遮罩{position:fixed; inset:0; z-index:110; display:none; align-items:flex-end; justify-content:center;
+    background:rgba(5,8,18,.55); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);}
+  .安装遮罩.开{display:flex;}
+  .安装遮罩 .底单{width:100%; max-width:520px; background:var(--card); border-radius:22px 22px 0 0; padding:18px 18px 24px;
+    box-shadow:0 -12px 40px rgba(0,0,0,.3); position:relative; animation:底单入 .28s cubic-bezier(.34,1.4,.64,1);
+    max-height:88vh; overflow:auto;}
+  @keyframes 底单入{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .安装遮罩 .底单 .抓手{width:38px; height:4px; border-radius:2px; background:var(--line); margin:0 auto 12px;}
+  .安装遮罩 .底单 h2{font-size:17px; font-weight:800; color:var(--ink); margin-bottom:4px;}
+  .安装遮罩 .底单 .说明{font-size:12.5px; color:var(--ink2); margin-bottom:14px;}
+  .安装遮罩 .底单 .关钮{position:absolute; right:14px; top:14px; width:30px; height:30px; border-radius:50%; border:none;
+    background:var(--bg); color:var(--ink2); font-size:18px; line-height:1; cursor:pointer;}
+  .网址框{display:flex; align-items:center; gap:8px; background:var(--bg); border:1px solid var(--line);
+    border-radius:11px; padding:9px 10px; margin-bottom:14px;}
+  .网址框 code{flex:1; min-width:0; font-size:12px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .网址框 .复制{flex:none; padding:6px 12px; border-radius:9px; border:1px solid var(--line); background:var(--card);
+    color:var(--blue); font-size:12px; font-weight:700; cursor:pointer;}
+  .步骤{display:flex; gap:10px; margin-bottom:10px; font-size:12.5px; color:var(--ink2); line-height:1.6;}
+  .步骤 .号{flex:none; width:20px; height:20px; border-radius:50%; background:var(--blue2); color:var(--blue);
+    font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; margin-top:1px;}
+  .步骤 b{color:var(--ink);}
+  .本地提示{margin:10px 0 14px; padding:10px 12px; border-radius:12px; font-size:12.5px; line-height:1.6;
+    background:color-mix(in srgb,#ffb43d 13%,transparent); border:1px solid color-mix(in srgb,#ffb43d 35%,transparent); color:#b45309;}
+  .一键装{width:100%; padding:13px; border-radius:13px; border:none; cursor:pointer; font-size:14.5px; font-weight:800;
+    color:#fff; background:linear-gradient(135deg,var(--blue),#7c4dff); box-shadow:0 8px 22px color-mix(in srgb,var(--blue) 34%,transparent);}
+
+  @media (max-width:560px){
+    .标题栏{flex-wrap:wrap;}
+    .按钮组{width:100%; justify-content:flex-end;}
+  }
+
+  /* 卡片内小标题：统一中文标题样式，统一左侧色条 */
+  .卡标题{font-size:15px; font-weight:700; color:var(--ink); margin:0 0 8px; padding-left:9px;
+    border-left:4px solid var(--blue); line-height:1.3;}
+
+  /* ══════════ 安全区适配：独立窗口铺满屏幕时避开刘海与手势条 ══════════ */
+  body.独立窗口 .wrap{
+    padding-left:env(safe-area-inset-left);
+    padding-right:env(safe-area-inset-right);
+  }
+  body.独立窗口 .胶囊导航{bottom:calc(22px + env(safe-area-inset-bottom));}
+
+  /* ══════════ 自动触发方案卡（对标东财条件单） ══════════ */
+  .方案顶栏{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:6px;}
+  .方案顶栏 .说明{font-size:12px; color:var(--ink2);}
+  .方案顶栏 .复制钮{display:inline-flex; align-items:center; gap:5px; padding:6px 12px; border-radius:9px;
+    border:1px solid var(--blue); background:transparent; color:var(--blue); font-size:12px; font-weight:600;
+    cursor:pointer; transition:background .16s ease, transform .16s ease;}
+  .方案顶栏 .复制钮:hover{background:color-mix(in srgb,var(--blue) 8%,transparent);}
+  .方案顶栏 .复制钮:active{transform:scale(.97);}
+  .方案顶栏 .复制钮.成了{background:color-mix(in srgb,#0e9f6e 12%,transparent); border-color:#0e9f6e; color:#0e9f6e;}
+  /* 参数格子：左标签右数值，等宽数字便于抄录 */
+  .格栏{display:grid; grid-template-columns:repeat(auto-fit,minmax(176px,1fr)); gap:9px; margin-top:10px;}
+  /* 窄屏（手机）：参数卡强制两列并排，避免单列拉得太长 */
+  @media(max-width:640px){
+    .格栏{grid-template-columns:1fr 1fr; gap:8px;}
+    .格子{padding:8px 9px;}
+    .格子 .值{font-size:14px;}
+    .格子 .注{font-size:10px; line-height:1.5;}
+    /* 9 张为奇数，末张跨满两列避免孤格 */
+    .格子.末张{grid-column:1 / -1;}
+  }
+  .格子{padding:9px 11px; border-radius:10px; border:1px solid var(--line);
+    background:linear-gradient(150deg, color-mix(in srgb,var(--blue) 7%,var(--card)), color-mix(in srgb,var(--blue) 2%,var(--card)) 100%);
+    border-left:3px solid var(--blue);}
+  .格子 .名{font-size:11px; color:var(--ink2);}
+  .格子 .值{font-size:15px; font-weight:700; margin-top:2px; font-variant-numeric:tabular-nums; color:var(--ink);}
+  .格子 .注{font-size:10.5px; color:var(--ink2); margin-top:2px;}
+  .格子.调_橙{border-left-color:#ea580c;
+    background:linear-gradient(150deg, color-mix(in srgb,#ea580c 8%,var(--card)), color-mix(in srgb,#ea580c 2%,var(--card)) 100%);}
+  .格子.调_紫{border-left-color:#7c3aed;
+    background:linear-gradient(150deg, color-mix(in srgb,#7c3aed 8%,var(--card)), color-mix(in srgb,#7c3aed 2%,var(--card)) 100%);}
+  .格子.调_绿{border-left-color:#0e9f6e;
+    background:linear-gradient(150deg, color-mix(in srgb,#0e9f6e 8%,var(--card)), color-mix(in srgb,#0e9f6e 2%,var(--card)) 100%);}
+  .格子.调_灰{border-left-color:#64748b;
+    background:linear-gradient(150deg, color-mix(in srgb,#64748b 8%,var(--card)), color-mix(in srgb,#64748b 2%,var(--card)) 100%);}
+  /* 阶梯表：每一档的触发价与买卖动作 */
+  .阶梯框{margin-top:12px; overflow:auto; border:1px solid var(--line); border-radius:10px;}
+  .阶梯框 table{font-size:12.5px;}
+  .阶梯框 th{text-align:center;}
+  .阶梯框 td{text-align:center;}
+  /* 方案卡内部提示条：浅色不抢眼，用于口径提醒 */
+  .方案提醒{margin-top:11px; padding:10px 13px; border-radius:10px; font-size:12.2px; line-height:1.75;
+    background:linear-gradient(90deg, color-mix(in srgb,#f59e0b 10%,var(--card)), color-mix(in srgb,#f59e0b 3%,var(--card)));
+    border:1px solid color-mix(in srgb,#f59e0b 34%,var(--line)); border-left:4px solid #f59e0b; color:var(--ink2);}
+  .方案提醒 b{color:#b45309;}
+  .params{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px;}
+  .field label{display:block; font-size:11px; color:var(--ink2); margin-bottom:3px;}
+  .field input{width:100%; padding:7px 9px; border:1px solid var(--set); border-left:3px solid var(--set); border-radius:8px; background:color-mix(in srgb,var(--set) 7%,var(--bg)); color:var(--ink); font-size:13px;}
+  .field input:focus{outline:none; border-color:var(--set);}
+  /* ══════════ 股票代码：输入框 + 历史记录下拉 ══════════ */
+  .代码格{position:relative; display:flex; align-items:center;}
+  .代码格 input{padding-right:32px;}
+  .下拉钮{position:absolute; right:2px; top:50%; transform:translateY(-50%);
+    width:26px; height:26px; padding:0; border-radius:6px; background:transparent;
+    color:var(--ink2); font-size:11px; line-height:1; display:grid; place-items:center;
+    transition:background .16s ease, color .16s ease, transform .2s ease;}
+  .下拉钮:hover{background:color-mix(in srgb,var(--set) 12%,transparent); color:var(--set);}
+  .下拉钮.开{transform:translateY(-50%) rotate(180deg); color:var(--set);}
+  /* 历史面板：浮在输入框下方，比输入框更宽（名称要看得全），带毛玻璃与阴影 */
+  .历史板{position:absolute; left:0; top:calc(100% + 6px); z-index:70;
+    width:max(100%, 268px); max-height:250px; overflow:auto; padding:5px;
+    background:linear-gradient(160deg,
+      color-mix(in srgb,var(--card) 97%,transparent),
+      color-mix(in srgb,var(--card) 92%,transparent));
+    -webkit-backdrop-filter:blur(14px) saturate(170%);
+    backdrop-filter:blur(14px) saturate(170%);
+    border:1px solid var(--line); border-radius:11px;
+    box-shadow:0 14px 36px -8px rgba(16,24,40,.3), 0 3px 10px rgba(16,24,40,.12);
+    animation:板出 .16s ease;}
+  @keyframes 板出{from{opacity:0; transform:translateY(-6px);} to{opacity:1; transform:none;}}
+  .历史项{display:flex; align-items:center; gap:8px; width:100%; padding:7px 9px;
+    border:none; border-radius:8px; background:transparent; cursor:pointer;
+    text-align:left; font-size:12.5px; color:var(--ink); transition:background .14s ease;}
+  .历史项:hover{background:color-mix(in srgb,var(--set) 11%,transparent);}
+  .历史项 .码{font-variant-numeric:tabular-nums; font-weight:700; color:var(--set); flex:none;}
+  .历史项 .名{flex:1; color:var(--ink2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .历史项 .删{flex:none; width:20px; height:20px; padding:0; border-radius:5px;
+    background:transparent; color:#98a2b3; font-size:13px; line-height:1;
+    display:grid; place-items:center;}
+  .历史项 .删:hover{background:#fee4e2; color:#b42318;}
+  .历史空{padding:12px 10px; font-size:12px; color:var(--ink2); text-align:center; white-space:normal;}
+  .历史底{display:flex; justify-content:flex-end; padding:3px 4px 2px; margin-top:2px;
+    border-top:1px solid var(--line);}
+  .历史底 button{padding:4px 9px; border-radius:6px; background:transparent;
+    color:#b42318; font-size:11px; font-weight:600;}
+  .历史底 button:hover{background:#fee4e2;}
+  .btns{display:flex; gap:10px; margin-top:11px; flex-wrap:wrap; align-items:center;}
+  button{padding:8px 18px; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer;}
+  /* 主操作按钮样式在下方「主按钮」区块统一定义（整行通栏 + 呼吸脉冲） */
+  @media (prefers-reduced-motion:reduce){ .btn-main{animation:none;} }
+  /* 参数状态条 */
+  .状态条{margin-top:9px; font-size:11.5px; line-height:1.6; padding:7px 11px; border-radius:8px;}
+  .状态条.已最新{background:#ecfdf5; color:#047857; border-left:3px solid #10b981;}
+  .状态条.待刷新{background:#fff7ed; color:#b45309; border-left:3px solid #f97316; font-weight:700;}
+  .状态条 b{color:#dc2626; font-weight:800;}
+  /* 次级按钮：描边弱化，不与主按钮争夺注意力 */
+  .btn-ghost{background:transparent; color:var(--blue); border:1px solid var(--blue);
+    font-size:12px; font-weight:600; padding:7px 14px; opacity:.82;}
+  .btn-ghost:hover{opacity:1; background:color-mix(in srgb,var(--blue) 6%,transparent);}
+  .src{font-size:12px; color:var(--ink2);}
+  .src b{color:var(--down);}
+  .src.off b{color:var(--gold);}
+  /* ══════════ 可设置栏 / 显示栏 颜色区分 ══════════ */
+  .chip{display:inline-flex; align-items:center; gap:6px; padding:4px 11px; border-radius:7px; font-size:11.5px; font-weight:600; color:#fff; white-space:nowrap;}
+  .chip::before{content:""; width:9px; height:9px; border-radius:2px; background:#fff; flex:none;}
+  .chip.set{background:var(--set);}
+  .chip.view{background:var(--view);}
+  .图例栏{display:flex; gap:12px; flex-wrap:wrap; margin-bottom:11px;}
+  .提示行{font-size:11px; color:var(--ink2); margin-top:9px; line-height:1.5;}
+  /* ══════════ 主按钮：整行通栏 + 呼吸脉冲，全页最重的视觉元素 ══════════ */
+  .btn-main{display:block; width:100%; margin:0 0 5px; padding:17px 26px; border:none; border-radius:12px;
+    font-size:17px; font-weight:800; letter-spacing:1.2px; color:#fff; cursor:pointer;
+    background:linear-gradient(135deg,#2563eb,#1d4ed8 55%,#1e40af);
+    box-shadow:0 8px 24px -6px rgba(37,99,235,.62), inset 0 1px 0 rgba(255,255,255,.28);
+    text-shadow:0 1px 2px rgba(0,0,0,.22); transition:transform .14s ease, box-shadow .2s ease, background .2s ease;
+    animation:主钮呼吸 2s ease-in-out infinite;}
+  .btn-main:hover{transform:translateY(-2px);
+    box-shadow:0 12px 30px -6px rgba(37,99,235,.75), inset 0 1px 0 rgba(255,255,255,.3);}
+  .btn-main:active{transform:translateY(1px) scale(.995);}
+  /* 待刷新态：橙色渐变 + 更急促的脉冲，强烈提示参数已改 */
+  .btn-main.待刷新{background:linear-gradient(135deg,#f97316,#ea580c 55%,#c2410c);
+    box-shadow:0 8px 26px -6px rgba(234,88,12,.68), inset 0 1px 0 rgba(255,255,255,.28);
+    animation:主钮呼吸橙 1.2s ease-in-out infinite;}
+  .btn-main.待刷新:hover{box-shadow:0 12px 32px -6px rgba(234,88,12,.82), inset 0 1px 0 rgba(255,255,255,.3);}
+  @keyframes 主钮呼吸{
+    0%,100%{box-shadow:0 8px 24px -6px rgba(37,99,235,.62), 0 0 0 0 rgba(37,99,235,.42), inset 0 1px 0 rgba(255,255,255,.28);}
+    50%{box-shadow:0 10px 28px -6px rgba(37,99,235,.72), 0 0 0 13px rgba(37,99,235,0), inset 0 1px 0 rgba(255,255,255,.28);}
+  }
+  @keyframes 主钮呼吸橙{
+    0%,100%{box-shadow:0 8px 26px -6px rgba(234,88,12,.68), 0 0 0 0 rgba(249,115,22,.55), inset 0 1px 0 rgba(255,255,255,.28);}
+    50%{box-shadow:0 11px 30px -6px rgba(234,88,12,.78), 0 0 0 18px rgba(249,115,22,0), inset 0 1px 0 rgba(255,255,255,.28);}
+  }
+  @media (prefers-reduced-motion:reduce){.btn-main{animation:none;}}
+  /* 按钮上方的指引箭头：与按钮同宽、居中对齐 */
+  .按钮指引{display:flex; align-items:center; justify-content:center; gap:5px;
+    font-size:11.5px; font-weight:700; color:#b45309; margin:0 0 4px; letter-spacing:.4px;}
+  /* 操作提示条：引导用户点击主按钮 */
+  .提示条{margin-top:10px; padding:11px 14px; border-radius:10px; font-size:13px; font-weight:600; line-height:1.6;
+    background:linear-gradient(90deg,#fde68a,#fef3c7 55%,#fffbeb); color:#92400e;
+    border:1px solid #fcd34d; border-left:5px solid #f59e0b;}
+  .提示条 b{color:#b45309; font-weight:800;}
+  .提示条 .必{display:inline-block; padding:1px 6px; border-radius:5px; background:#f59e0b; color:#fff;
+    font-size:11px; font-weight:800; letter-spacing:.5px; margin-right:5px; vertical-align:1px;}
+  .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px;}
+  .kpi{position:relative; overflow:hidden;
+    background:linear-gradient(150deg,
+      color-mix(in srgb,var(--卡色,#cbd5e1) 11%,var(--card)),
+      color-mix(in srgb,var(--卡色,#cbd5e1) 4%,var(--card)) 100%);
+    border:1px solid var(--line); border-left:3px solid var(--卡色,#cbd5e1); border-radius:10px; padding:10px 12px;}
+  .kpi .k{display:flex; align-items:center; gap:5px; font-size:11px; color:var(--ink2);}
+  .kpi .图标{width:14px; height:14px; flex:0 0 auto; color:var(--卡色,#cbd5e1);}
+  .kpi .图标 svg{width:100%; height:100%; display:block;}
+  .kpi .v{font-size:17px; font-weight:700; margin-top:3px; font-variant-numeric:tabular-nums;}
+  .kpi .s{font-size:11px; color:var(--ink2); margin-top:1px;}
+  .kpi::after{content:""; position:absolute; right:-16px; top:-16px; width:42px; height:42px; border-radius:50%; background:color-mix(in srgb,var(--卡色,#cbd5e1) 14%,transparent); pointer-events:none;}
+  .pos{color:var(--up);} .neg{color:var(--down);} .kpi .v.view{color:var(--view);}
+  .调_红{--卡色:#d63a3a;} .调_绿{--卡色:#0e9f6e;} .调_青{--卡色:#0d9488;}
+  .调_蓝{--卡色:#2563eb;} .调_紫{--卡色:#7c3aed;} .调_橙{--卡色:#ea580c;} .调_灰{--卡色:#64748b;}
+  svg{width:100%; height:auto; display:block;}
+  .tblbox{overflow:auto; max-height:560px; border:1px solid var(--line); border-radius:10px;
+    scroll-padding-bottom:12px;}
+  /* 表格滚到底时，最后几行不被悬浮胶囊遮住 */
+  .tblbox::after{content:""; display:block; height:64px;}
+  table{border-collapse:collapse; width:100%; font-size:12.5px; font-variant-numeric:tabular-nums; white-space:nowrap;}
+  /* 表头：先用 background 打好底色回退，再用 background-image 叠渐变。
+     sticky 单元格上简写 background 会连带重置 background-image，拆开写才稳。 */
+  thead th{position:sticky; top:0; background-color:var(--表头一);
+    background-image:linear-gradient(180deg,var(--表头二),var(--表头一));
+    background-repeat:no-repeat; background-size:100% 100%;
+    color:#fff; padding:7px 8px; font-weight:600; text-align:right; z-index:2; box-shadow:inset 0 -3px 0 var(--view);}
+  thead th:nth-child(1){text-align:center; position:sticky; left:0; z-index:3;
+    background-color:var(--表头一);
+    background-image:linear-gradient(180deg,var(--表头二),var(--表头一));
+    background-repeat:no-repeat; background-size:100% 100%;
+    box-shadow:inset -1px 0 0 rgba(255,255,255,.22), inset 0 -3px 0 var(--view);}
+  tbody td{padding:5px 8px; border-top:1px solid var(--line); text-align:right;}
+  /* 固定列底色跟随卡片渐变，避免在渐变卡面上露出灰色方块 */
+  tbody td:first-child{text-align:center; color:var(--ink2); position:sticky; left:0; z-index:1;
+    background:var(--卡面二); box-shadow:2px 0 4px -2px rgba(0,0,0,.18);}
+  tbody tr:nth-child(even) td:first-child{background:color-mix(in srgb, var(--卡面二), #8a94a6 8%);}
+  tbody tr:hover td:first-child{background:var(--blue2);}
+  tbody tr:nth-child(even){background:color-mix(in srgb, var(--卡面二) 70%, transparent);}
+  tbody tr:hover{background:var(--blue2);}
+  .act-buy{color:var(--up); font-weight:600;} .act-sell{color:var(--down); font-weight:600;}
+  details{margin-top:10px;}
+  summary{cursor:pointer; font-weight:600; color:var(--blue);}
+  .note{font-size:12.5px; color:var(--ink2); line-height:1.9;}
+  .note b{color:var(--ink);}
+  .legend{display:flex; gap:16px; font-size:12px; color:var(--ink2); margin-bottom:6px; flex-wrap:wrap;}
+  .legend i{font-style:normal; font-weight:700;}
+  @media print{.btns{display:none;} .tblbox{max-height:none;}}
+
+  /* ══════════ 日期输入：禁用原生弹窗，改用自绘日历面板 ══════════ */
+  .field input.日期格{padding-right:32px; cursor:pointer; background-color:var(--bg);
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a869a' stroke-width='2' stroke-linecap='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='3'/%3E%3Cpath d='M8 3v4M16 3v4M3 10h18'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 9px center; background-size:15px;}
+  [hidden]{display:none !important;}
+  .遮罩{position:fixed; inset:0; z-index:99; display:flex; align-items:flex-end; justify-content:center;
+    background:rgba(12,18,28,.5); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px); animation:淡入 .18s ease;}
+  .面板{width:100%; max-width:392px; background:var(--card); border:1px solid var(--line);
+    border-radius:18px 18px 0 0; padding:14px 16px calc(14px + env(safe-area-inset-bottom));
+    box-shadow:0 -10px 44px rgba(0,0,0,.3); animation:上滑 .24s cubic-bezier(.22,1,.36,1);}
+  @media(min-width:520px){ .遮罩{align-items:center; padding:20px;} .面板{border-radius:18px;} }
+  @keyframes 淡入{from{opacity:0}to{opacity:1}}
+  @keyframes 上滑{from{transform:translateY(26px); opacity:.5}to{transform:none; opacity:1}}
+  .面板头{display:flex; align-items:center; gap:8px;}
+  .年月钮{flex:1; padding:9px 6px; border:none; border-radius:10px; background:transparent; color:var(--ink);
+    font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; cursor:pointer;}
+  .年月钮:hover{background:var(--blue2); color:var(--blue);}
+  .月箭{width:36px; height:36px; flex:none; display:grid; place-items:center; border-radius:10px;
+    background:var(--bg); border:1px solid var(--line); color:var(--ink); font-size:17px; line-height:1; cursor:pointer;}
+  .月箭:hover{border-color:var(--blue); color:var(--blue);}
+  .星期行{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin:8px 0 4px;
+    font-size:11px; color:var(--ink2); text-align:center;}
+  .星期行 span:nth-child(6),.星期行 span:nth-child(7){color:var(--up); opacity:.8;}
+  .日格网{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
+  .日格{aspect-ratio:1; display:flex; align-items:center; justify-content:center; border:none; border-radius:10px;
+    background:transparent; color:var(--ink); font-size:14.5px; cursor:pointer; font-variant-numeric:tabular-nums;
+    transition:background .12s, color .12s, box-shadow .12s;}
+  .日格:hover{background:var(--blue2);}
+  .日格.他月{color:var(--ink2); opacity:.42;}
+  .日格.今天{color:var(--blue); font-weight:700; box-shadow:inset 0 0 0 1.5px var(--blue);}
+  .日格.选中{background:var(--blue); color:#fff; font-weight:700; box-shadow:0 3px 10px rgba(37,99,235,.35);}
+  .年网格,.月网格{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:10px 0 4px;}
+  .年格,.月格{padding:13px 0; border-radius:10px; background:var(--bg); border:1px solid var(--line);
+    color:var(--ink); font-size:13.5px; font-variant-numeric:tabular-nums; cursor:pointer;}
+  .年格:hover,.月格:hover{border-color:var(--blue); color:var(--blue);}
+  .年格.选中,.月格.选中{background:var(--blue); border-color:var(--blue); color:#fff; font-weight:700;}
+  .面板底{display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid var(--line);}
+  .底钮{padding:9px 14px; border-radius:9px; background:var(--bg); border:1px solid var(--line);
+    color:var(--ink); font-size:13px; cursor:pointer;}
+  .底钮:hover{border-color:var(--blue); color:var(--blue);}
+  .底钮.主{background:var(--blue); border-color:var(--blue); color:#fff;}
+  .选中提示{flex:1; text-align:center; font-size:12px; color:var(--ink2);
+    font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+
+  /* ══════════ 窄屏适配 ══════════ */
+  @media(max-width:520px){
+    body{padding:10px; font-size:13.5px;}
+    .wrap{gap:10px;}
+    .card{padding:12px 13px; border-radius:14px;}
+    h1{font-size:16px; display:block; line-height:1.4;}
+    h1 .tag{display:none;}
+    .sub{font-size:11.5px;}
+    /* 参数区：两列，标签底部对齐、输入框齐平 */
+    .params{grid-template-columns:1fr 1fr; gap:11px 10px;}
+    .field{display:flex; flex-direction:column;}
+    .field label{font-size:10.5px; line-height:1.3; margin-bottom:4px; min-height:23px; display:flex; align-items:flex-end;}
+    .field input{padding:8px 9px; font-size:13px;}
+    .提示行{font-size:10.5px; margin-top:8px;}
+    /* 图例两枚标签：并排等宽，文字过长时自动折行 */
+    .图例栏{flex-direction:row; align-items:stretch; gap:8px;}
+    .图例栏 .chip{flex:1 1 0; min-width:0; white-space:normal; align-items:flex-start;
+      padding:5px 9px; font-size:10.5px; line-height:1.35; text-align:left;}
+    .图例栏 .chip::before{margin-top:3.5px;}
+    /* 按钮：主操作整行通栏并置顶，两个导出并排在下 */
+    .btns{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:9px;}
+    .btns .src{grid-column:1 / -1; text-align:center;}
+    .btns button{width:100%; padding:10px 12px;}
+    .btn-main{padding:16px 14px; font-size:15.5px; letter-spacing:.6px;}
+    .kpis{grid-template-columns:1fr 1fr; gap:8px;}
+    .kpi{padding:9px 10px;}
+    .kpi .v{font-size:15.5px;}
+    .tblbox{max-height:70vh;}
+  }
+  @media(max-width:360px){ .params{grid-template-columns:1fr;} }
+
+  /* ══════════ 悬空胶囊底部导航栏 ══════════ */
+  .胶囊导航{
+    position:fixed; left:50%; bottom:22px; transform:translateX(-50%);
+    z-index:60; display:flex; align-items:center; gap:4px; padding:6px;
+    border-radius:999px; max-width:calc(100vw - 28px);
+    background:linear-gradient(150deg,
+      color-mix(in srgb,var(--card) 92%,transparent),
+      color-mix(in srgb,var(--card) 74%,transparent));
+    -webkit-backdrop-filter:blur(18px) saturate(180%);
+    backdrop-filter:blur(18px) saturate(180%);
+    border:1px solid color-mix(in srgb,var(--line) 70%,transparent);
+    box-shadow:0 10px 32px -6px rgba(16,24,40,.22), 0 2px 8px rgba(16,24,40,.10),
+      inset 0 1px 0 rgba(255,255,255,.5);
+    /* 宽度随选中项展开而变，一并过渡，避免整体跳动 */
+    transition:transform .35s cubic-bezier(.34,1.4,.64,1), opacity .28s ease,
+      width .3s cubic-bezier(.4,0,.2,1);
+  }
+  html[data-theme="dark"] .胶囊导航{box-shadow:0 10px 32px -6px rgba(0,0,0,.6), 0 2px 8px rgba(0,0,0,.4),
+      inset 0 1px 0 rgba(255,255,255,.08);}
+  /* 滚到顶部时淡出隐藏，不挡标题 */
+  .胶囊导航.收起{transform:translateX(-50%) translateY(120%); opacity:0; pointer-events:none;}
+
+  .胶囊项{
+    position:relative; display:flex; align-items:center; gap:0;
+    /* 图标态紧凑：左右各 14px；选中展开文字时由 .字 撑开 */
+    padding:9px 14px; border-radius:999px; border:none; cursor:pointer;
+    background:transparent; color:var(--ink2); font-size:12.5px; font-weight:600;
+    white-space:nowrap; transition:all .22s ease; overflow:hidden;
+  }
+  .胶囊项 svg{width:16px; height:16px; flex:none; stroke:currentColor; fill:none;
+    stroke-width:2; stroke-linecap:round; stroke-linejoin:round; transition:transform .22s ease;}
+  /* 文字部分：默认收起，仅选中项展开 */
+  .胶囊项 .字{
+    display:inline-block; max-width:0; opacity:0; overflow:hidden; margin-left:0;
+    transition:max-width .3s cubic-bezier(.4,0,.2,1), opacity .22s ease, margin-left .3s ease;
+  }
+  .胶囊项:hover{background:color-mix(in srgb,var(--blue) 9%,transparent); color:var(--blue);}
+  .胶囊项.选中{
+    background:linear-gradient(135deg,var(--blue),color-mix(in srgb,var(--blue) 78%,#7c3aed));
+    color:#fff; box-shadow:0 4px 14px -3px color-mix(in srgb,var(--blue) 68%,transparent);
+    /* 选中态左右各加 4.5mm（合计 9mm），展开的文字有呼吸空间，
+       图标态其余按钮保持 14px 紧凑，不白占地方 */
+    padding:9px calc(14px + 4.5mm);
+  }
+  .胶囊项.选中 .字{max-width:120px; opacity:1; margin-left:7px;}
+  .胶囊项.选中 svg{transform:scale(1.08);}
+  .胶囊项:active{transform:scale(.95);}
+
+  /* 顶部滑过指示：细横线 */
+  .胶囊项::after{
+    content:""; position:absolute; left:50%; bottom:4px; transform:translateX(-50%) scaleX(0);
+    width:14px; height:2px; border-radius:2px; background:currentColor; opacity:.55;
+    transition:transform .25s ease;
+  }
+  .胶囊项.选中::after{transform:translateX(-50%) scaleX(1); opacity:0;}
+
+  /* 正文底部留白：胶囊高约 52px + 底部边距，确保任何内容都能完整滚出来 */
+  body{padding-bottom:104px;}
+
+  /* 窄屏：图标为主，文字仅在选中项展开；选中态同样加宽 9mm */
+  @media(max-width:520px){
+    .胶囊导航{bottom:14px; gap:2px; padding:5px;}
+    .胶囊项{padding:10px 13px;}
+    .胶囊项 svg{width:17px; height:17px;}
+    .胶囊项.选中{padding:10px calc(13px + 3mm);}
+    .胶囊项.选中 .字{max-width:90px; margin-left:6px; font-size:12px;}
+    body{padding-bottom:96px;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .胶囊导航,.胶囊项,.胶囊项 .字{transition:none;}
+  }
+  @media print{ .胶囊导航{display:none;} body{padding-bottom:0;} }
+  .关注勾{display:inline-flex; align-items:center; gap:5px; font-size:13px; color:var(--ink2); cursor:pointer; user-select:none; margin-left:auto;}
+  .关注勾 input{width:15px; height:15px; accent-color:var(--up);}
+.云态.ok{color:#19b36b}
+.云态.err{color:#ff5d5d}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="card">
+    <div class="标题栏">
+      <div class="左">
+        <h1><span id="标题文字">网格交易策略回测</span><span class="tag">每日收盘信号 · 逐日模拟</span></h1>
+        <div class="sub" id="副标题">高抛低吸 · 逆向网格 —— 涨则卖、跌则买，震荡市自动收割价差</div>
+      </div>
+      <div class="按钮组">
+        <button class="图标钮" id="主题钮" title="切换主题：浅色 / 深色 / 跟随系统" aria-label="切换主题"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M2 12h2.5M19.5 12H22M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg></button>
+        <button class="图标钮" id="下载钮" title="装到手机桌面" aria-label="装到手机桌面"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+        <button class="图标钮" id="刷新钮" title="刷新数据" aria-label="刷新数据"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg></button>
+        <button class="图标钮 自动开" id="自动钮" title="自动刷新开关（5分钟）" aria-label="自动刷新开关"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3.5 2"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="区_参数">
+    <div class="params">
+      <div class="field"><label>股票名称</label><input id="名称" value="标的名称" oninput="标脏()"></div>
+      <div class="field"><label>股票代码</label>
+        <div class="代码格" id="代码格">
+          <input id="代码" value="513300" oninput="标脏()" autocomplete="off" list="历史代码">
+          <button type="button" class="下拉钮" id="历史钮" title="历史查询记录" aria-label="历史查询记录">▾</button>
+          <div class="历史板" id="历史板" hidden></div>
+        </div>
+      </div>
+      <div class="field"><label>起始日期</label><input id="起始" class="日期格" type="text" readonly inputmode="none" value="2026-06-01"></div>
+      <div class="field"><label>结束日期</label><input id="结束" class="日期格" type="text" readonly inputmode="none" value="2026-09-30"></div>
+      <div class="field"><label>初始投入（元）</label><input id="初始金额" type="number" value="20000" min="1000" step="100" oninput="标脏()"></div>
+      <div class="field"><label>底仓金额（元）</label><input id="底仓金额" type="number" value="20000" min="0" step="100" oninput="标脏()"></div>
+      <div class="field"><label>每 1% 交易金额（元）</label><input id="百分点金额" type="number" value="10000" min="100" step="100" oninput="标脏()"></div>
+      <div class="field"><label>累计投入上限（元，0=不限）</label><input id="投入上限" type="number" value="0" min="0" step="1000" oninput="标脏()"></div>
+      <div class="field"><label>盘后持仓上限（元，0=不限）</label><input id="持仓上限" type="number" value="0" min="0" step="1000" oninput="标脏()"></div>
+      <div class="field"><label>卖出比例（倍，1=标准）</label><input id="卖出倍数" type="number" value="1" min="0.1" max="5" step="0.1" oninput="标脏()"></div>
+    </div>
+    <div class="提示行">股票代码：沪市 5/6/9 · 深市 0/1/3 · 北交所 4/8 开头；换代码后点下方按钮，名称自动识别。点右侧 ▾ 可选历史查询记录</div>
+    <div class="legend 图例栏">
+      <span class="chip set">可设置栏（参数，改完需点按钮生效）</span>
+      <span class="chip view">显示栏（计算结果，只读联动）</span>
+    </div>
+    <div class="提示条"><span class="必">必读</span>所有数据设置好后，<b>必须点击下方按钮</b>才会重新联网拉取并重新计算</div>
+    <div class="按钮指引">▼ 点这里，参数才会生效 ▼</div>
+    <button class="btn-main" id="主按钮" onclick="重新拉取()">▶ 重新拉取行情并计算</button>
+    <div class="btns">
+      <button class="btn-ghost" onclick="导出()">⬇ 导出明细表格</button>
+      <button class="btn-ghost" onclick="导出电子表格()">⬇ 导出电子表格</button>
+      <span class="src" id="数据源状态">…</span>
+    </div>
+    <div class="状态条 已最新" id="参数状态">● 当前结果已按最新参数计算</div>
+  </div>
+
+  <div class="card" id="区_汇总">
+    <div class="kpis" id="汇总卡"></div>
+  </div>
+
+  <div class="card" id="区_走势">
+    <div class="legend">
+      <span><i style="color:var(--ink2)">—</i> 收盘价</span>
+      <span><i style="color:var(--up)">▲</i> 买入日</span>
+      <span><i style="color:var(--down)">▼</i> 卖出日</span>
+      <span><i style="color:var(--gold)">◆</i> 建仓日</span>
+    </div>
+    <div id="图容器"></div>
+  </div>
+
+  <div class="card" id="区_自动">
+    <h2 class="卡标题">自动触发方案 · 东方财富条件单参数</h2>
+    <div class="方案顶栏">
+      <span class="说明">把回测参数换算成东财「条件单 / 智能网格」可直接抄录的数字，照填即可自动触发</span>
+      <button type="button" class="复制钮" id="复制方案">⧉ 复制全部参数</button>
+    </div>
+    <div class="格栏" id="方案格"></div>
+    <div class="方案提醒" id="方案提醒"></div>
+    <div id="阶梯区"></div>
+    <details>
+      <summary>东财实操步骤与口径差异</summary>
+      <div class="note" style="margin-top:8px">
+        <b>为什么不能完全等价</b><br>
+        本工具按<b>每日收盘价</b>产生信号，成交价即当日收盘；东财条件单按<b>盘中实时价</b>触发，成交价是触发瞬间的市价。
+        两者只在「当日单边行情」时结果接近，<b>日内来回震荡</b>时东财会多触发几次，
+        <b>单边大涨大跌</b>时东财可能少触发几次（价格直接跳过档位）。<br>
+        <b>实操步骤（东财 App）</b><br>
+        ① 搜代码 → 进入标的页 → 底部「交易」→ 登录后进「条件单」。<br>
+        ② 选「价格条件」→「价格下穿」→ 填买入档位价 → 委托数量填下方对应档位的股数 → 有效期选<b>长期 / 30 天</b>。<br>
+        ③ 重复 ②，把「价格上穿」的卖出档位逐条挂好。档位可一次挂 5～10 条，成交后系统会短信提醒。<br>
+        ④ 若用「智能网格交易」：把<b>基准价</b>填当前价、<b>每格涨跌幅</b>填网格步长、<b>每格数量</b>填每档股数、
+        <b>价格区间上下限</b>填下方给出的区间，一张单就把整段网格托管出去了。<br>
+        <b>两者取舍</b><br>
+        智能网格省事但会把格数拉满（占用资金更多）；普通条件单逐条挂更贴合本工具口径（受底仓保护约束），但要手动补档。
+        建议先挂普通条件单跑一个月，对比实际成交与回测的偏差，再决定是否切智能网格。
+      </div>
+    </details>
+  </div>
+
+  <div class="card" id="区_明细">
+    <div class="tblbox"><table id="明细表"></table></div>
+    <details>
+      <summary>策略规则与计算口径</summary>
+      <div class="note" style="margin-top:8px">
+        <b>交易规则</b><br>
+        ① 建仓日：按收盘价买入<b>最接近初始投入金额</b>的份额，须为 100 份整数倍（四舍五入）；当日只建仓、不计盈亏，累计收益与收益率为 0。<br>
+        ② 次日起每日收盘后按涨跌幅反向操作：<b>跌 X% 买入 X×每1%金额</b>；<b>涨 X% 卖出 X×每1%金额</b>。<br>
+        ③ 成交份额取<b>最接近目标金额</b>的 100 份整数倍，成交金额按实际份额 × 当日收盘价；涨跌幅为 0 或不足一手（100份）不成交。<br>
+        ④ 卖出不得超过现有持仓（卖穿自动截断为全部持仓）。<br>
+        ⑤ 底仓保护：卖出后持仓市值不得低于<b>底仓金额</b>，持仓市值已低于该值则停止卖出（始终保留底仓）。<br>
+        <b>计算口径</b><br>
+        盘前持仓市值 = 期初份额 × 前收；当日盈亏 = 期初份额 × (今收 − 前收)；盘后市值 = 盘后份额 × 今收。<br>
+        持仓每份成本 = 移动加权平均（买入摊入，卖出不变，清仓归零）；买卖金额/份额：<b>正=买入、负=卖出</b>。<br>
+        累计投入现金 = Σ买入 − Σ卖出（净投入，卖出视为收回本金；<b>为负表示本金已全部收回</b>）；累计持仓收益 = 盘后市值 − 累计投入（等价当日清仓总盈亏）；<b>累计收益率 = 累计收益 ÷ 累计投入本金</b>，累计投入本金取「累计净投入」与「初始投入金额」的较大者——净投入转负时自动退回初始本金作分母，保证收益率恒可计算、不会空白。<br>
+        校验恒等式：<b>盘后市值 = 盘前市值 + 当日盈亏 + 当日买卖金额</b>。未计佣金等摩擦成本；数据为前复权日线，来源腾讯财经行情接口。
+      </div>
+    </details>
+  </div>
+
+  <div class="遮罩" id="日期遮罩" hidden>
+    <div class="面板" role="dialog" aria-modal="true" aria-label="选择日期">
+      <div class="面板头">
+        <button class="月箭" id="箭上" title="上一页">‹</button>
+        <button class="年月钮" id="年月钮" title="快速选择年 / 月">—</button>
+        <button class="月箭" id="箭下" title="下一页">›</button>
+      </div>
+      <div class="星期行" id="星期行"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+      <div class="日格网" id="日格网"></div>
+      <div class="年网格" id="年网格" hidden></div>
+      <div class="月网格" id="月网格" hidden></div>
+      <div class="面板底">
+        <button class="底钮" id="今天钮">今天</button>
+        <span class="选中提示" id="选中提示">—</span>
+        <button class="底钮 主" id="关闭钮">取消</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════ 悬空胶囊底部导航栏 ══════════ -->
+<nav class="胶囊导航 收起" id="胶囊导航" aria-label="页面快速导航">
+  <button class="胶囊项 选中" data-区="区_参数" title="参数设置">
+    <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></svg>
+    <span class="字">参数</span>
+  </button>
+  <button class="胶囊项" data-区="区_汇总" title="汇总指标">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+    <span class="字">汇总</span>
+  </button>
+  <button class="胶囊项" data-区="区_走势" title="走势图">
+    <svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 3 5-7"/><path d="M17 7h4v4"/><path d="M3 21h18"/></svg>
+    <span class="字">走势</span>
+  </button>
+  <button class="胶囊项" data-区="区_自动" title="自动触发方案">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><path d="M12 12 L12 7"/><path d="M12 12 L15.4 14"/></svg>
+    <span class="字">自动</span>
+  </button>
+  <button class="胶囊项" data-区="区_明细" title="逐日明细">
+    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/></svg>
+    <span class="字">明细</span>
+  </button>
+  <button class="胶囊项" data-区="顶" title="回到顶部">
+    <svg viewBox="0 0 24 24"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
+    <span class="字">顶部</span>
+  </button>
+</nav>
+
+<!-- ══════════ 通用吐司提示 ══════════ -->
+<div id="吐司"><div class="吐司内"><span class="吐司图"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3.5 2"/></svg></span><span class="吐司文" id="吐司文"></span></div></div>
+
+<!-- ══════════ 装到手机桌面弹层 ══════════ -->
+<div class="安装遮罩" id="安装遮罩">
+  <div class="底单">
+    <button class="关钮" id="安装关" aria-label="关闭">×</button>
+    <div class="抓手"></div>
+    <h2>装到手机桌面</h2>
+    <div class="说明">装好后像 App 一样，点图标直接进回测工具</div>
+    <div class="网址框"><code id="安装网址"></code><button class="复制" id="安装复制">复制网址</button></div>
+    <div class="本地提示" id="安装本地提示" style="display:none">
+      <b>你现在打开的是本地文件</b><br>装桌面请用上面这个线上地址，在浏览器里打开后添加，本地文件加不了桌面。
+    </div>
+    <div class="步骤"><span class="号">1</span><div><b>安卓 Chrome</b><br>打开上面的网址 → 浏览器菜单 ⋮ →「添加到主屏幕」或「安装应用」</div></div>
+    <div class="步骤"><span class="号">2</span><div><b>iPhone Safari</b><br>打开上面的网址 → 底部「分享」→「添加到主屏幕」</div></div>
+    <div class="步骤"><span class="号">3</span><div><b>装好后</b><br>图标名「网格回测」，点开即独立全屏，无地址栏</div></div>
+    <div class="步骤"><span class="号">4</span><div><b>想导出数据</b><br>用页内「导出明细表格 / 导出电子表格」按钮存成文件</div></div>
+    <button class="一键装" id="安装直装">一键装到手机桌面</button>
+  </div>
+</div>
+
+<script>
+/* ═══════════ 离线快照（接口不可达时兜底，2026-10-02 拉取） ═══════════ */
+const 快照 = [["2025-09-18", 2.163], ["2025-09-19", 2.172], ["2025-09-22", 2.189], ["2025-09-23", 2.212], ["2025-09-24", 2.201], ["2025-09-25", 2.195], ["2025-09-26", 2.189], ["2025-09-29", 2.206], ["2025-09-30", 2.21], ["2025-10-09", 2.254], ["2025-10-10", 2.262], ["2025-10-13", 2.233], ["2025-10-14", 2.205], ["2025-10-15", 2.244], ["2025-10-16", 2.251], ["2025-10-17", 2.211], ["2025-10-20", 2.265], ["2025-10-21", 2.298], ["2025-10-22", 2.331], ["2025-10-23", 2.327], ["2025-10-24", 2.352], ["2025-10-27", 2.408], ["2025-10-28", 2.413], ["2025-10-29", 2.455], ["2025-10-30", 2.431], ["2025-10-31", 2.426], ["2025-11-03", 2.42], ["2025-11-04", 2.384], ["2025-11-05", 2.366], ["2025-11-06", 2.416], ["2025-11-07", 2.387], ["2025-11-10", 2.423], ["2025-11-11", 2.43], ["2025-11-12", 2.447], ["2025-11-13", 2.442], ["2025-11-14", 2.375], ["2025-11-17", 2.371], ["2025-11-18", 2.297], ["2025-11-19", 2.297], ["2025-11-20", 2.39], ["2025-11-21", 2.31], ["2025-11-24", 2.333], ["2025-11-25", 2.376], ["2025-11-26", 2.401], ["2025-11-27", 2.39], ["2025-11-28", 2.41], ["2025-12-01", 2.395], ["2025-12-02", 2.397], ["2025-12-03", 2.412], ["2025-12-04", 2.407], ["2025-12-05", 2.406], ["2025-12-08", 2.397], ["2025-12-09", 2.374], ["2025-12-10", 2.383], ["2025-12-11", 2.363], ["2025-12-12", 2.365], ["2025-12-15", 2.339], ["2025-12-16", 2.3], ["2025-12-17", 2.324], ["2025-12-18", 2.298], ["2025-12-19", 2.329], ["2025-12-22", 2.377], ["2025-12-23", 2.366], ["2025-12-24", 2.363], ["2025-12-25", 2.351], ["2025-12-26", 2.342], ["2025-12-29", 2.325], ["2025-12-30", 2.325], ["2025-12-31", 2.31], ["2026-01-05", 2.346], ["2026-01-06", 2.351], ["2026-01-07", 2.346], ["2026-01-08", 2.336], ["2026-01-09", 2.333], ["2026-01-12", 2.32], ["2026-01-13", 2.34], ["2026-01-14", 2.326], ["2026-01-15", 2.321], ["2026-01-16", 2.328], ["2026-01-19", 2.305], ["2026-01-20", 2.284], ["2026-01-21", 2.271], ["2026-01-22", 2.309], ["2026-01-23", 2.299], ["2026-01-26", 2.282], ["2026-01-27", 2.307], ["2026-01-28", 2.34], ["2026-01-29", 2.325], ["2026-01-30", 2.297], ["2026-02-02", 2.241], ["2026-02-03", 2.296], ["2026-02-04", 2.278], ["2026-02-05", 2.257], ["2026-02-06", 2.219], ["2026-02-09", 2.261], ["2026-02-10", 2.26], ["2026-02-11", 2.253], ["2026-02-12", 2.253], ["2026-02-13", 2.244], ["2026-02-24", 2.226], ["2026-02-25", 2.223], ["2026-02-26", 2.232], ["2026-02-27", 2.21], ["2026-03-02", 2.183], ["2026-03-03", 2.177], ["2026-03-04", 2.159], ["2026-03-05", 2.215], ["2026-03-06", 2.215], ["2026-03-09", 2.163], ["2026-03-10", 2.203], ["2026-03-11", 2.204], ["2026-03-12", 2.192], ["2026-03-13", 2.17], ["2026-03-16", 2.179], ["2026-03-17", 2.167], ["2026-03-18", 2.198], ["2026-03-19", 2.157], ["2026-03-20", 2.138], ["2026-03-23", 2.066], ["2026-03-24", 2.113], ["2026-03-25", 2.131], ["2026-03-26", 2.116], ["2026-03-27", 2.106], ["2026-03-30", 2.075], ["2026-03-31", 2.054], ["2026-04-01", 2.137], ["2026-04-02", 2.102], ["2026-04-03", 2.116], ["2026-04-07", 2.119], ["2026-04-08", 2.221], ["2026-04-09", 2.2], ["2026-04-10", 2.209], ["2026-04-13", 2.202], ["2026-04-14", 2.241], ["2026-04-15", 2.275], ["2026-04-16", 2.335], ["2026-04-17", 2.317], ["2026-04-20", 2.318], ["2026-04-21", 2.319], ["2026-04-22", 2.325], ["2026-04-23", 2.331], ["2026-04-24", 2.335], ["2026-04-27", 2.378], ["2026-04-28", 2.389], ["2026-04-29", 2.385], ["2026-04-30", 2.386], ["2026-05-06", 2.464], ["2026-05-07", 2.518], ["2026-05-08", 2.521], ["2026-05-11", 2.577], ["2026-05-12", 2.546], ["2026-05-13", 2.566], ["2026-05-14", 2.572], ["2026-05-15", 2.548], ["2026-05-18", 2.5], ["2026-05-19", 2.499], ["2026-05-20", 2.516], ["2026-05-21", 2.551], ["2026-05-22", 2.585], ["2026-05-25", 2.688], ["2026-05-26", 2.656], ["2026-05-27", 2.703], ["2026-05-28", 2.683], ["2026-05-29", 2.757], ["2026-06-01", 2.865], ["2026-06-02", 2.83], ["2026-06-03", 2.791], ["2026-06-04", 2.724], ["2026-06-05", 2.687], ["2026-06-08", 2.581], ["2026-06-09", 2.687], ["2026-06-10", 2.607], ["2026-06-11", 2.584], ["2026-06-12", 2.619], ["2026-06-15", 2.73], ["2026-06-16", 2.761], ["2026-06-17", 2.761], ["2026-06-18", 2.752], ["2026-06-22", 2.746], ["2026-06-23", 2.657], ["2026-06-24", 2.681], ["2026-06-25", 2.718], ["2026-06-26", 2.65], ["2026-06-29", 2.668], ["2026-06-30", 2.704], ["2026-07-01", 2.71], ["2026-07-02", 2.657], ["2026-07-03", 2.669], ["2026-07-06", 2.677], ["2026-07-07", 2.668], ["2026-07-08", 2.631], ["2026-07-09", 2.67], ["2026-07-10", 2.674], ["2026-07-13", 2.653], ["2026-07-14", 2.66], ["2026-07-15", 2.689], ["2026-07-16", 2.661], ["2026-07-17", 2.567], ["2026-07-20", 2.556], ["2026-07-21", 2.609], ["2026-07-22", 2.599], ["2026-07-23", 2.6], ["2026-07-24", 2.568], ["2026-07-27", 2.591], ["2026-07-28", 2.516], ["2026-07-29", 2.529], ["2026-07-30", 2.486], ["2026-07-31", 2.578], ["2026-08-03", 2.593], ["2026-08-04", 2.665], ["2026-08-05", 2.748], ["2026-08-06", 2.712], ["2026-08-07", 2.725], ["2026-08-10", 2.734], ["2026-08-11", 2.693], ["2026-08-12", 2.705], ["2026-08-13", 2.708], ["2026-08-14", 2.751], ["2026-08-17", 2.761], ["2026-08-18", 2.719], ["2026-08-19", 2.669], ["2026-08-20", 2.685], ["2026-08-21", 2.664], ["2026-08-24", 2.63], ["2026-08-25", 2.671], ["2026-08-26", 2.681], ["2026-08-27", 2.71], ["2026-08-28", 2.71], ["2026-08-31", 2.694], ["2026-09-01", 2.7], ["2026-09-02", 2.655], ["2026-09-03", 2.655], ["2026-09-04", 2.692], ["2026-09-07", 2.708], ["2026-09-08", 2.699], ["2026-09-09", 2.697], ["2026-09-10", 2.675], ["2026-09-11", 2.661], ["2026-09-14", 2.641], ["2026-09-15", 2.643], ["2026-09-16", 2.662], ["2026-09-17", 2.664], ["2026-09-18", 2.712], ["2026-09-21", 2.729], ["2026-09-22", 2.792], ["2026-09-23", 2.827], ["2026-09-24", 2.786], ["2026-09-28", 2.771], ["2026-09-29", 2.779], ["2026-09-30", 2.818]];   /* [日期, 收盘价] 全量历史，离线兜底；基准昨收动态取区间前最后一个交易日 */
+
+/* ═══════════ 工具 ═══════════ */
+const 取 = id => document.getElementById(id);
+const 舍2 = x => Math.round((x + Number.EPSILON) * 100) / 100;
+/* 价格保留 3 位：A 股/ETF 报价最小变动多为 0.001 元，条件单触发价必须精确到分毫 */
+const 舍3 = x => Math.round((x + Number.EPSILON) * 1000) / 1000;
+const 千分 = (x, 位=2) => (x===null || x===undefined || x==="") ? "—" :
+  x.toLocaleString("zh-CN", {minimumFractionDigits:位, maximumFractionDigits:位});
+const 带号 = (x, 位=2) => x>0 ? "+" + 千分(x,位) : 千分(x,位);
+const 涨跌类 = x => x>0 ? "pos" : (x<0 ? "neg" : "");
+/* 金额单位自适应：≤1万显示"元"，>1万换算"万" */
+const 金额 = 数值 => {
+  const 绝 = Math.abs(数值);
+  return 绝 >= 10000 ? (数值/10000).toFixed(2) + " 万" : 千分(数值) + " 元";
+};
+const 带号金额 = 数值 => {
+  const 绝 = Math.abs(数值);
+  return 绝 >= 10000 ? (数值<0 ? "-" : "+") + (绝/10000).toFixed(2) + " 万" : 带号(数值) + " 元";
+};
+
+/* ═══════════ 行情拉取（腾讯接口，支持任意沪深代码） ═══════════
+   提速策略：不再串行逐页翻，而是把整段区间切成若干「不超过 200 天」的小片，
+   一次性并行发出。单请求实测只回约 250 条（约 1 年），200 天远小于该上限，
+   每个分片必然一次拿全，无需翻页；总耗时≈最慢那一片，10 年跨度可秒级返回。 */
+const 分片天数 = 200;
+const 并发上限 = 8;                        // 同时最多 8 个请求，避免被接口限流
+const 单请求超时 = 12000;
+
+/* 带超时的 fetch：接口偶发卡住时不至于让整个页面干等 */
+async function 限时取(地址){
+  const 控 = new AbortController();
+  const 钟 = setTimeout(() => 控.abort(), 单请求超时);
+  try{
+    const 响应 = await fetch(地址, {headers:{"User-Agent":"Mozilla/5.0"}, signal: 控.signal});
+    return 响应;
+  }finally{ clearTimeout(钟); }
+}
+
+/* 把 [起,止] 按自然日切成若干分片（相邻片首尾相差 1 天，靠 Map 去重） */
+function 切分片(起, 止){
+  const 片 = [];
+  let 头 = 起;
+  const 天毫秒 = 86400000;
+  while(头 <= 止 && 片.length < 400){
+    const 尾 = new Date(new Date(头).getTime() + (分片天数-1)*天毫秒).toISOString().slice(0,10);
+    const 实尾 = 尾 < 止 ? 尾 : 止;
+    片.push([头, 实尾]);
+    if(实尾 >= 止) break;
+    头 = new Date(new Date(实尾).getTime() + 天毫秒).toISOString().slice(0,10);
+  }
+  return 片;
+}
+
+/* 分批并发执行：每批至多 并发上限 个，批内并行、批间串行 */
+async function 分批并发(任务s){
+  const 出 = [];
+  for(let i = 0; i < 任务s.length; i += 并发上限){
+    const 批 = 任务s.slice(i, i + 并发上限).map(任务 => 任务());
+    出.push(...await Promise.all(批));
+  }
+  return 出;
+}
+
+async function 拉取行情(代码, 起, 止){
+  /* 代码前缀映射：北交所 4/8 开头 → bj；沪市 5/6/9 开头 → sh；深市 0/1/2/3 开头 → sz */
+  const 前缀 = /^[48]/.test(代码) ? "bj" : (/^[569]/.test(代码) ? "sh" : "sz");
+  const 每页 = 600;                       // 单请求条数上限；分片仅 200 天，留足冗余
+  const 标的 = 前缀 + 代码;
+  const 片s = 切分片(起, 止);
+
+  const 结果s = await 分批并发(片s.map(([片起, 片止]) => async () => {
+    const 地址 = `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${标的},day,${片起},${片止},${每页},qfq`;
+    try{
+      const 响应 = await 限时取(地址);
+      if(!响应.ok) return {片起, 片止, 错误: "接口响应 " + 响应.status};
+      const 数据 = await 响应.json();
+      const 节点 = 数据 && 数据.data && 数据.data[标的];
+      if(!节点) return {片起, 片止, 行: [], 名称: null};
+      return {片起, 片止, 行: 节点.qfqday || 节点.day || [], 名称: 读名称(节点, 标的)};
+    }catch(e){
+      return {片起, 片止, 错误: e.name === "AbortError" ? "请求超时" : e.message};
+    }
+  }));
+
+  /* 汇总：任意一片成功即保留其数据（少量分片失败不影响整体，
+     后续按首日判断缺口并如实提示） */
+  const 表 = new Map();
+  let 名称 = null, 失败数 = 0, 首个错误 = null;
+  结果s.forEach(片 => {
+    if(片.名称 && !名称) 名称 = 片.名称;
+    if(片.错误){ 失败数++; if(!首个错误) 首个错误 = 片.错误; return; }
+    (片.行 || []).forEach(r => 表.set(r[0], r));   // 日期为键自动去重
+  });
+
+  if(!表.size) throw new Error(首个错误 || "未返回行情数据，请检查代码与日期");
+
+  const 已序 = [...表.values()].sort((a,b)=> a[0] < b[0] ? -1 : 1);
+  const 基准行 = 已序.filter(r => r[0] < 起).slice(-1)[0];
+  const 区内 = 已序.filter(r => r[0] >= 起 && r[0] <= 止).map(r => [r[0], +r[2]]);
+  if(!区内.length) throw new Error("区间内无行情数据");
+
+  /* 首日晚于请求起始日 → 该标的此前无行情（多为未上市），如实告知而非静默少算 */
+  const 实际起 = 区内[0][0];
+  const 缺口 = 实际起 > 起 ? {请求起: 起, 实际起, 条数: 区内.length} : null;
+  /* 个别分片失败且缺口不成立时，提示可能不完整，避免误以为数据齐全 */
+  const 警告 = (失败数 && !缺口) ? {失败片: 失败数, 首错: 首个错误} : null;
+  return {基准昨收: 基准行 ? +基准行[2] : null, 区内, 名称, 缺口, 警告};
+}
+
+/* 从接口节点中读取标的名称（qt 节点自带，UTF-8 直读） */
+function 读名称(节点, 标的){
+  const qt = 节点 && 节点.qt;
+  const 条 = qt && qt[标的];
+  return (条 && 条[1]) ? String(条[1]).trim() : null;
+}
+
+/* ═══════════ 回测引擎（与口径说明严格一致） ═══════════ */
+/* 手续费率（万分之，双边）：ETF 免五、费率极低，按万二（0.02%）自动扣除，买多付卖少收 */
+const 手续费万 = 2;
+
+function 回测(行情, 初始金额, 百分点金额, 基准昨收, 底仓金额 = 初始金额, 投入上限 = 0, 费率万 = 手续费万, 持仓上限 = 0, 卖出倍数 = 1){
+  const 行 = [];
+  /* 基准昨收 = 区间前最后交易日收盘价，仅用于建仓日涨跌幅展示，不参与回测 */
+  let 份额 = 0, 成本 = 0, 净投入 = 0, 买次 = 0, 卖次 = 0, 累计费用 = 0;
+  /* 手续费（万分之几，双边）：买入时多付、卖出时少收，均按成交额计 */
+  const 费率 = 费率万 > 0 ? 费率万/10000 : 0;
+  /* 双上限（任一触发即停止买入）：
+     投入上限 → 约束净投入（Σ买入 − Σ卖出），管住「实际掏出去的钱」
+     持仓上限 → 约束每日盘后持仓市值（份额 × 收盘价），管住「仓位规模」
+     均为 0 表示该项不限 */
+  const 投入顶 = 投入上限 > 0 ? 投入上限 : Infinity;
+  const 持仓顶 = 持仓上限 > 0 ? 持仓上限 : Infinity;
+  /* 卖出比例（倍）：涨 X% 时卖出 X%×百分点金额×比例；1=标准比例，0.5=减半卖（惜售），2=加倍卖（积极止盈） */
+  const 卖倍 = 卖出倍数 > 0 ? 卖出倍数 : 1;
+  let 触顶日 = null;
+  /* 按双上限截断买入份额：投入维度看剩余现金额度，持仓维度看买入后市值是否越顶，取更严者；
+     整百取整，不足一手则一手不买并记触顶日 */
+  const 截断买入 = (目标份, 价, 日期) => {
+    const 按投入 = Math.floor((投入顶 - 净投入)/价/100)*100;
+    const 按持仓 = Math.floor(持仓顶/价/100)*100 - 份额;
+    const 可买 = Math.max(0, Math.min(按投入, 按持仓));
+    const 得 = Math.min(目标份, 可买);
+    if(得 < 目标份) 触顶日 = 触顶日 ?? 日期;
+    return 得;
+  };
+  行情.forEach(([日期, 收盘], i) => {
+    const 昨收 = i > 0 ? 行情[i-1][1] : 基准昨收;
+    const 涨跌幅 = 昨收 ? 舍2((收盘/昨收 - 1)*100) : null;
+    const 期初份额 = 份额;
+    let 目标 = 0, 买份 = 0, 卖份 = 0;
+    if(i === 0){                                   /* 建仓日 */
+      目标 = Math.round(初始金额/收盘/100)*100;
+      买份 = 截断买入(目标, 收盘, 日期);
+    } else if(涨跌幅 !== 0){                        /* 逐日反向操作 */
+      /* 买入：跌 X% 就按 X%×百分点金额 补仓，永远积极
+         卖出比例：涨 X% 卖出 X%×百分点金额×比例；1=标准比例，0.5=减半卖（更惜售），2=加倍卖 */
+      if(涨跌幅 < 0) 目标 = Math.round(Math.abs(涨跌幅)*百分点金额/收盘/100)*100;
+      else 目标 = Math.round(Math.abs(涨跌幅)*百分点金额/收盘*卖倍/100)*100;
+      if(目标 > 0){
+        if(涨跌幅 < 0) 买份 = 截断买入(目标, 收盘, 日期);
+        else {                                   /* 卖出：受持仓上限与底仓下限双重约束 */
+          const 盘前 = 期初份额 * (昨收 ?? 收盘);
+          if(盘前 < 底仓金额) 卖份 = 0;          /* 当日持仓(盘前)已低于底仓，不卖出 */
+          else {
+            const 底仓份额 = Math.ceil(底仓金额/收盘/100)*100;   /* 至少保留的整百份额 */
+            const 可卖 = Math.max(0, 期初份额 - 底仓份额);        /* 卖出后市值不低于底仓 */
+            卖份 = Math.min(目标, 可卖);
+          }
+        }
+      }
+    }
+    const 盘后 = 期初份额 + 买份 - 卖份;
+    const 买额 = 买份*收盘, 卖额 = 卖份*收盘;
+    const 当日费用 = (买额 + 卖额)*费率;          /* 双边按成交额计费 */
+    累计费用 += 当日费用;
+    if(买份 > 0)      成本 = 盘后 > 0 ? (成本*期初份额 + 买额*(1+费率))/盘后 : 0;
+    else if(盘后 === 0) 成本 = 0;
+    /* 净投入口径 = 实际现金流：买入付出含费，卖出回笼扣费 */
+    净投入 += 买额*(1+费率) - 卖额*(1-费率);
+    份额 = 盘后;
+    const 盘前市值 = 期初份额 ? 期初份额*(昨收 ?? 收盘) : 0;
+    const 当日盈亏 = 期初份额 ? 期初份额*(收盘 - (昨收 ?? 收盘)) : 0;
+    买次 += 买份>0; 卖次 += 卖份>0;
+    行.push({
+      日期, 收盘, 涨跌幅, 盘前市值:舍2(盘前市值), 当日盈亏:舍2(当日盈亏),
+      买卖金额:舍2(买额 - 卖额), 买卖份额:买份-卖份,
+      买额:舍2(买额), 卖额:舍2(卖额), 费用:舍2(当日费用),
+      盘后市值:舍2(盘后*收盘), 份额:盘后, 成本:舍2(成本*10000)/10000,
+      /* 分母=累计投入本金：卖出回收会让净投入转负，故下限保护为初始本金，保证分母恒正、收益率恒可算 */
+      收益率: 舍2((盘后*收盘 - 净投入)/Math.max(净投入, 初始金额)*100),
+      收益:舍2(盘后*收盘 - 净投入), 净投入:舍2(净投入),
+      动作: 买份>0 ? "买入" : (卖份>0 ? "卖出" : ""), 建仓: i===0
+    });
+  });
+  return {行, 买次, 卖次, 触顶日, 累计费用};
+}
+
+/* ═══════════ 渲染 ═══════════ */
+let 当前结果 = null, 当前名称 = "", 快照模式 = false;
+
+/* 参与计算的参数快照：用于判断「参数已改但未刷新」 */
+let 已算参数 = null;
+
+/* 采集全部参与计算的参数 */
+function 取参数(){
+  return {
+    名称: 取("名称").value.trim(),
+    代码: 取("代码").value.trim(),
+    起始: 取("起始").value,
+    结束: 取("结束").value,
+    初始金额: 取("初始金额").value,
+    底仓金额: 取("底仓金额").value,
+    百分点金额: 取("百分点金额").value,
+    投入上限: 取("投入上限").value,
+    持仓上限: 取("持仓上限").value,
+    卖出倍数: 取("卖出倍数").value
+  };
+}
+
+/* 找出与上次计算不一致的参数，返回中文差异列表 */
+function 参数差异(){
+  if(!已算参数) return [];
+  const 今 = 取参数();
+  const 名 = {名称:"股票名称", 代码:"股票代码", 起始:"起始日期", 结束:"结束日期",
+    初始金额:"初始投入", 底仓金额:"底仓金额", 百分点金额:"每1%交易金额", 投入上限:"累计投入上限", 持仓上限:"盘后持仓上限", 卖出倍数:"卖出比例"};
+  return Object.keys(名).filter(k => 今[k] !== 已算参数[k])
+    .map(k => `${名[k]}：${已算参数[k] || "空"} → ${今[k] || "空"}`);
+}
+
+/* 参数变更时标脏：主按钮转橙 + 状态条提示差异。
+   注意：不做「是否已算过」的拦截——首次拉取失败时同样要让用户看到
+   「参数已改、按钮可点」的提示，否则界面会像卡死一样毫无反馈。 */
+function 标脏(){
+  const 差 = 参数差异();
+  const 钮 = 取("主按钮"), 条 = 取("参数状态");
+  if(当前结果 && !差.length) return 标净();   // 已算且无差异 → 复位为"已最新"
+  钮.classList.add("待刷新");
+  钮.textContent = "⟳ 参数已修改，点此重新计算";
+  条.className = "状态条 待刷新";
+  条.innerHTML = 差.length
+    ? `⚠ 参数已修改但<b>尚未重新计算</b>，下方表格仍是旧结果：<br>` +
+      `　　` + 差.join("<br>　　")
+    : `⚠ 参数已修改，<b>尚未重新计算</b>。点击上方按钮重新联网拉取并计算。`;
+}
+
+/* 计算完成：按钮复位、状态条变绿，并记录本次参数快照 */
+function 标净(){
+  const 钮 = 取("主按钮"), 条 = 取("参数状态");
+  钮.classList.remove("待刷新");
+  钮.textContent = "▶ 重新拉取行情并计算";
+  条.className = "状态条 已最新";
+  条.innerHTML = `● 当前结果已按最新参数计算 · ` +
+     `底仓 ${金额(+取("底仓金额").value || 0)} · 初始 ${金额(+取("初始金额").value || 0)} · 每1% ${金额(+取("百分点金额").value || 0)}`;
+  已算参数 = 取参数();
+}
+
+function 卡图标(类型){
+  const 表 = {
+    折线升:'<path d="M2 12 L6 7 L9 9 L14 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+    折线降:'<path d="M2 3 L6 8 L9 6 L14 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+    圆环:'<circle cx="8" cy="8" r="5.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 11 L14 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+    柱:'<path d="M3 13 V8 H6 V13 M10 13 V4 H13 V13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+    水滴:'<path d="M8 2 C5.5 6.5 3.5 9 3.5 11 a4.5 4.5 0 0 0 9 0 C12.5 9 10.5 6.5 8 2 Z" fill="none" stroke="currentColor" stroke-width="1.8"/>',
+    单日降:'<path d="M2 5 H14 M14 5 L10 2 M14 5 L10 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+    单日升:'<path d="M2 11 H14 M14 11 L10 14 M14 11 L10 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+    流水:'<path d="M2 8 H12 M8 5 L12 8 L8 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+    上箭:'<path d="M8 13 V4 M8 4 L5 7 M8 4 L11 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+    下箭:'<path d="M8 3 V12 M8 12 L5 9 M8 12 L11 9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+    日历:'<rect x="3" y="4" width="10" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 7 H13 M6 2 V5 M10 2 V5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+    趋势:'<path d="M2 11 L6 6 L9 9 L14 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 4 H14 V7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+    盾:'<path d="M8 2 L13 4 V8 C13 11 11 13 8 14 C5 13 3 11 3 8 V4 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M5.8 8 L7.4 9.6 L10.4 6.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'
+  };
+  return 表[类型] || 表.折线升;
+}
+
+function 渲染汇总(r, 行情){
+  const 末 = r.行[r.行.length-1];
+  const 上限值 = +取("投入上限").value || 0;
+  const 持仓值 = +取("持仓上限").value || 0;
+  const 卖倍值 = +取("卖出倍数").value || 1;
+  const 万元卖 = +取("百分点金额").value || 10000;   /* 每 1% 对应的标准卖出金额 */
+  /* 本金底：累计净投入峰值（最少投入本金），用于计算手续费占比等相对指标 */
+  const 本金底 = Math.max(r.行.reduce((m, x) => Math.max(m, x.净投入), 0), +取("初始金额").value || 1);
+  const 首收 = 行情.find(x => x[0] >= 取("起始").value)?.[1] ?? r.行[0].收盘;
+  const 区间涨跌 = 舍2((末.收盘/首收 - 1)*100);
+  const 占用峰 = r.行.reduce((m, x) => x.净投入 > m.值 ? {值:x.净投入, 日:x.日期} : m, {值:-Infinity, 日:""});
+  const 峰占用 = 占用峰.值 < 0 ? 0 : 占用峰.值;
+  const 峰占用日 = 占用峰.值 < 0 ? "—" : 占用峰.日;
+  let 累亏 = null, 累盈 = null, 当亏 = null, 当盈 = null, 最买 = null, 最卖 = null;
+  for(const x of r.行){
+    if(累亏 === null || x.收益 < 累亏.收益) 累亏 = x;
+    if(累盈 === null || x.收益 > 累盈.收益) 累盈 = x;
+    if(当亏 === null || x.当日盈亏 < 当亏.当日盈亏) 当亏 = x;
+    if(当盈 === null || x.当日盈亏 > 当盈.当日盈亏) 当盈 = x;
+    if(x.买额 > 0 && (最买 === null || x.买额 > 最买.买额)) 最买 = x;
+    if(x.卖额 > 0 && (最卖 === null || x.卖额 > 最卖.卖额)) 最卖 = x;
+  }
+  /* 底仓死拿不动：建仓日买入份额持有到期末，全程不买不卖 */
+  const 建仓 = r.行[0];
+  const 底仓份 = 建仓.买卖份额;
+  const 底仓成本 = 舍2(底仓份 * 建仓.收盘);
+  const 底仓现值 = 舍2(底仓份 * 末.收盘);
+  const 底仓盈亏 = 舍2(底仓现值 - 底仓成本);
+  const 底仓收益率 = 底仓成本 ? 舍2(底仓盈亏/底仓成本*100) : 0;
+  const 主题 = {
+    收益:["红","折线升"], 收益率:["橙","圆环"], 市值:["蓝","柱"], 占用:["青","水滴"],
+    累亏:["绿","折线降"], 累盈:["红","折线升"], 当亏:["绿","单日降"], 当盈:["红","单日升"],
+    当买:["紫","上箭"], 当卖:["紫","下箭"], 底仓:["橙","柱"],
+    净投:["蓝","流水"], 买入:["紫","上箭"], 卖出:["紫","下箭"], 交易:["灰","日历"], 标的:["青","趋势"], 上限:["紫","盾"], 额度:["青","水滴"], 费用:["灰","圆环"], 费占:["灰","柱"], 仓顶:["橙","柱"], 倍:["紫","折线升"]
+  };
+  const 卡 = [
+    ["期末累计收益", 带号金额(末.收益), 涨跌类(末.收益), "若当日清仓的总盈亏", "收益"],
+    ["期末累计收益率", 带号(末.收益率) + "%", 涨跌类(末.收益率), "累计收益 ÷ 本金 " + 金额(Math.max(末.净投入, +取("初始金额").value)), "收益率"],
+    ["期末持仓市值", 金额(末.盘后市值), "", 末.份额.toLocaleString() + " 份", "市值"],
+    ["最大占用资金", 金额(峰占用), "view", "Σ买入 − Σ卖出 的峰值，发生于 " + 峰占用日, "占用"],
+    ["累计最大亏损", 带号金额(累亏.收益), 涨跌类(累亏.收益), 累亏.日期 + " · 持仓收益率 " + 带号(累亏.收益率) + "%", "累亏"],
+    ["累计最大盈利", 带号金额(累盈.收益), 涨跌类(累盈.收益), 累盈.日期 + " · 持仓收益率 " + 带号(累盈.收益率) + "%", "累盈"],
+    ["当日最大亏损", 带号金额(当亏.当日盈亏), 涨跌类(当亏.当日盈亏), 当亏.日期 + " · 当日涨跌幅 " + 带号(当亏.涨跌幅) + "%", "当亏"],
+    ["当日最大盈利", 带号金额(当盈.当日盈亏), 涨跌类(当盈.当日盈亏), 当盈.日期 + " · 当日涨跌幅 " + 带号(当盈.涨跌幅) + "%", "当盈"],
+    ["当日最大买入", 金额(最买.买额), "pos", 最买.日期 + " · 当日涨跌幅 " + 带号(最买.涨跌幅) + "%", "当买"],
+    ["当日最大卖出", 金额(最卖.卖额), "neg", 最卖.日期 + " · 当日涨跌幅 " + 带号(最卖.涨跌幅) + "%", "当卖"],
+    ["底仓死拿不动", 带号金额(底仓盈亏), 涨跌类(底仓盈亏), "买入 " + 底仓份.toLocaleString() + " 份持有不动 · 收益率 " + 带号(底仓收益率) + "%", "底仓"],
+    ["累计净投入", 金额(末.净投入), "", "Σ买入 − Σ卖出（含手续费）", "净投"],
+    ["累计手续费", 金额(r.累计费用), "", `双边万${手续费万}（0.0${手续费万}%）· 买入多付、卖出少收`, "费用"],
+    ["累计投入上限", 上限值 > 0 ? 金额(上限值) : "不限", 上限值 > 0 && r.触顶日 ? "neg" : "", 上限值 > 0 ? (r.触顶日 ? `已于 ${r.触顶日} 触顶，此后不再加钱` : "未触顶 · 额度内正常买入") : "未设上限 · 资金不受约束", "上限"],
+    ["盘后持仓上限", 持仓值 > 0 ? 金额(持仓值) : "不限", 持仓值 > 0 && r.触顶日 ? "neg" : "", 持仓值 > 0 ? (r.触顶日 ? `已于 ${r.触顶日} 触顶，买入不越仓` : "未触顶 · 持仓在限内") : "未设上限 · 仓位不受约束", "仓顶"],
+    ["卖出比例", "×" + 卖倍值, 卖倍值 !== 1 ? "view" : "", 卖倍值 > 1 ? `涨1%卖 ${金额(万元卖*卖倍值)} · 比标准多卖 ${((卖倍值-1)*100).toFixed(0)}%` : (卖倍值 < 1 ? `涨1%卖 ${金额(万元卖*卖倍值)} · 比标准少卖 ${((1-卖倍值)*100).toFixed(0)}%` : `涨1%卖 ${金额(万元卖)} · 与买入同力度`), "倍"],
+    ["剩余可投额度", 上限值 > 0 ? 金额(Math.max(上限值 - 末.净投入, 0)) : "—", "", 上限值 > 0 ? (上限值 - 末.净投入 <= 0 ? "额度已用尽 · 卖出回笼后恢复" : "上限 − 期末净投入 · 跌了也不能再加") : "未设上限，无额度概念", "额度"],
+    ["手续费占本金比", 本金底 ? 舍2(r.累计费用/本金底*100) + "%" : "—", "", "累计手续费 ÷ 累计投入本金 · 交易频次越高损耗越大", "费占"],
+    ["买入日数", r.买次 + " 次", "pos", "累计买入 " + 金额(r.行.reduce((s,x)=>s+(x.买卖金额>0?x.买卖金额:0),0)), "买入"],
+    ["卖出日数", r.卖次 + " 次", "neg", "累计卖出 " + 金额(-r.行.reduce((s,x)=>s+(x.买卖金额<0?x.买卖金额:0),0)), "卖出"],
+    ["回测交易日", r.行.length + " 天", "", 取("起始").value + " ~ " + 取("结束").value, "交易"],
+    ["标的方向涨跌", 带号(区间涨跌) + "%", 涨跌类(区间涨跌), "同期收盘价 " + 首收 + " → " + 末.收盘, "标的"],
+  ];
+  取("汇总卡").innerHTML = 卡.map(([k,v,c,s,键]) => {
+    const [色,图标] = 主题[键] || ["灰","折线升"];
+    return `<div class="kpi 调_${色}"><div class="k"><span class="图标"><svg viewBox="0 0 16 16">${卡图标(图标)}</svg></span>${k}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`;
+  }).join("");
+}
+
+function 渲染图(行情, 行){
+  const 宽 = 1120, 高 = 340, 左 = 56, 右 = 14, 上 = 14, 主高 = 220, 副高 = 70, 副顶 = 上 + 主高 + 26;
+  const 收盘 = 行.map(x => x.收盘);
+  const lo = Math.min(...收盘), hi = Math.max(...收盘), 边 = (hi-lo)*0.08 || 0.05;
+  const y1 = v => 上 + 主高 - (v-(lo-边))/((hi+边)-(lo-边))*主高;
+  const n = 行.length;
+  const x = i => 左 + (n===1 ? 0 : i/(n-1))*(宽-左-右);
+  const 涨跌极 = Math.max(...行.map(r=>Math.abs(r.涨跌幅||0)), 1);
+  const y2 = v => 副顶 + 副高/2 - v/涨跌极*(副高/2);
+  let 主图 = "", 副图 = "";
+  for(let k=0; k<=4; k++){
+    const v = lo-边 + k/4*((hi+边)-(lo-边));
+    主图 += `<line x1="${左}" y1="${y1(v)}" x2="${宽-右}" y2="${y1(v)}" stroke="var(--line)" stroke-width="1"/>
+             <text x="${左-6}" y="${y1(v)+4}" text-anchor="end" font-size="10.5" fill="var(--ink2)">${v.toFixed(3)}</text>`;
+  }
+  [涨跌极, 涨跌极/2, 0, -涨跌极/2, -涨跌极].forEach(v => {
+    副图 += `<text x="${左-6}" y="${y2(v)+4}" text-anchor="end" font-size="9.5" fill="var(--ink2)">${v.toFixed(1)}%</text>`;
+  });
+  副图 += `<line x1="${左}" y1="${y2(0)}" x2="${宽-右}" y2="${y2(0)}" stroke="var(--line)"/>`;
+  const 路径 = 行.map((r,i) => (i?"L":"M") + x(i).toFixed(1) + " " + y1(r.收盘).toFixed(1)).join(" ");
+  const 步 = Math.ceil(n/9);
+  let 刻度 = "";
+  行.forEach((r,i) => { if(i%步===0 || i===n-1)
+    刻度 += `<text x="${x(i)}" y="${上+主高+16}" text-anchor="middle" font-size="10" fill="var(--ink2)">${r.日期.slice(5)}</text>`; });
+  const 点 = 行.map((r,i) => {
+    if(r.建仓) return `<path d="M${x(i)} ${y1(r.收盘)-9} l5 9 h-10 Z" fill="var(--gold)"/><text x="${x(i)}" y="${y1(r.收盘)+22}" text-anchor="middle" font-size="9" fill="var(--gold)" font-weight="700">建</text>`;
+    /* 买入=红▲：顶点贴价格点下方 3px、尖朝上指向低点；卖出=绿▼：顶点贴上方 3px、尖朝下指向高点（与图例 ▲买入 ▼卖出 一致） */
+    if(r.买卖份额>0) return `<path d="M${x(i)} ${y1(r.收盘)+3} l5 9 h-10 Z" fill="var(--up)"/>`;
+    if(r.买卖份额<0) return `<path d="M${x(i)} ${y1(r.收盘)-3} l5 -9 h-10 Z" fill="var(--down)"/>`;
+    return "";
+  }).join("");
+  const 柱 = 行.map((r,i) => {
+    if(r.涨跌幅===null) return "";
+    const h = Math.abs(y2(r.涨跌幅)-y2(0));
+    return `<rect x="${x(i)-2.2}" y="${Math.min(y2(r.涨跌幅),y2(0))}" width="4.4" height="${Math.max(h,0.8)}" rx="1" fill="${r.涨跌幅>0?"var(--up)":"var(--down)"}" opacity="0.85"/>`;
+  }).join("");
+  const 提示 = 行.map((r,i) => `<circle cx="${x(i)}" cy="${y1(r.收盘)}" r="7" fill="transparent"><title>${r.日期} 收盘 ${r.收盘}  涨跌 ${r.涨跌幅?? "—"}%  ${r.动作||"无操作"} ${r.买卖份额? Math.abs(r.买卖份额)+"份":""}</title></circle>`).join("");
+  取("图容器").innerHTML = `<svg viewBox="0 0 ${宽} ${高}" xmlns="http://www.w3.org/2000/svg">
+    ${主图}${刻度}<path d="${路径}" fill="none" stroke="var(--blue)" stroke-width="1.8"/>
+    ${点}${副图}${柱}${提示}
+    <text x="${左}" y="${副顶-8}" font-size="10" fill="var(--ink2)">当日涨跌幅</text>
+  </svg>`;
+}
+
+function 渲染表(行){
+  const 头 = ["日期","收盘价","涨跌幅","盘前持仓市值","当日盈亏","当日买卖金额","当日买卖份额(份)","买卖方向","持仓份额(份)","每份成本","累计收益率","累计收益","盘后持仓市值","累计投入现金"];
+  let 体 = "";
+  行.forEach(r => {
+    const 动作 = r.建仓 ? `<span style="color:var(--gold);font-weight:700">建仓</span>` :
+      (r.动作 ? `<span class="${r.买卖份额>0?"act-buy":"act-sell"}">${r.动作}</span>` : `<span style="color:var(--ink2)">—</span>`);
+    体 += `<tr>
+      <td>${r.日期}</td>
+      <td>${r.收盘.toFixed(3)}</td>
+      <td class="${涨跌类(r.涨跌幅)}">${r.涨跌幅===null ? "—" : 带号(r.涨跌幅)+"%"}</td>
+      <td>${金额(r.盘前市值)}</td>
+      <td class="${涨跌类(r.当日盈亏)}">${带号金额(r.当日盈亏)}</td>
+      <td class="${r.买卖金额>0?"act-buy":(r.买卖金额<0?"act-sell":"")}" style="text-align:right">${带号金额(r.买卖金额)} ${动作}</td>
+      <td class="${r.买卖份额>0?"act-buy":(r.买卖份额<0?"act-sell":"")}">${r.买卖份额 ? 带号(r.买卖份额,0) : "—"}</td>
+      <td>${动作}</td>
+      <td>${r.份额.toLocaleString()}</td>
+      <td>${r.成本 ? r.成本.toFixed(4) : "—"}</td>
+      <td class="${涨跌类(r.收益率)}">${r.收益率===null ? "—" : 带号(r.收益率)+"%"}</td>
+      <td class="${涨跌类(r.收益)}">${带号金额(r.收益)}</td>
+      <td>${金额(r.盘后市值)}</td>
+      <td>${带号金额(r.净投入)}</td></tr>`;
+  });
+  取("明细表").innerHTML = `<thead><tr>${头.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody>${体}</tbody>`;
+}
+
+/* ═══════════ 历史查询记录：本机保存，下拉即选 ═══════════ */
+const 历史键 = "网格回测_历史代码_v1";
+const 历史上限 = 60;
+
+function 读历史(){
+  try{
+    const 原 = JSON.parse(localStorage.getItem(历史键) || "[]");
+    if(!Array.isArray(原)) return [];
+    /* 兼容旧结构，只保留「有代码」的条目 */
+    return 原.filter(x => x && typeof x.代码 === "string" && x.代码)
+              .map(x => ({代码: x.代码, 名称: x.名称 || "", 时间: x.时间 || 0}));
+  }catch(e){ return []; }
+}
+
+function 写历史(列){
+  try{ localStorage.setItem(历史键, JSON.stringify(列.slice(0, 历史上限))); }catch(e){}
+}
+
+/* 记录一次成功查询：同代码去重后置顶，保留最近的名称与时间 */
+function 记历史(代码, 名称){
+  const 码 = (代码 || "").trim();
+  if(!码) return;
+  const 列 = 读历史().filter(x => x.代码 !== 码);
+  列.unshift({代码: 码, 名称: (名称 || "").trim(), 时间: Date.now()});
+  写历史(列);
+  刷新历史板();
+}
+
+function 删历史(代码){
+  const 列 = 读历史().filter(x => x.代码 !== 代码);
+  写历史(列);
+  刷新历史板();
+}
+
+function 清历史(){
+  if(!读历史().length) return;
+  if(!confirm("确定清空全部历史查询记录？此操作不可撤销。")) return;
+  写历史([]);
+  刷新历史板();
+}
+
+/* 取用时写入代码框并标脏，仍由用户点主按钮统一计算 */
+function 用历史(代码, 名称){
+  if(代码) 取("代码").value = 代码;
+  if(名称) 取("名称").value = 名称;
+  关历史板();
+  标脏();
+}
+
+/* 面板宽度大于输入框，窄屏时若会顶出右边界就改为贴右对齐，避免被裁掉 */
+function 摆历史板(){
+  const 板 = 取("历史板"), 格 = 取("代码格") || 取("代码").parentElement;
+  板.style.left = "0"; 板.style.right = "auto";
+  const r = 板.getBoundingClientRect();
+  if(r.right > window.innerWidth - 10){
+    板.style.left = "auto";
+    板.style.right = "0";
+  }
+}
+
+function 刷新历史板(){
+  const 板 = 取("历史板");
+  if(!板) return;
+  const 列 = 读历史();
+  if(!列.length){
+    板.innerHTML = `<div class="历史空">还没有查询记录<br>成功计算一次后自动保存</div>`;
+    return;
+  }
+  const 现在 = Date.now();
+  const 多久 = t => {
+    if(!t) return "";
+    const 分 = Math.floor((现在 - t) / 60000);
+    if(分 < 1) return "刚刚";
+    if(分 < 60) return 分 + " 分钟前";
+    const 时 = Math.floor(分 / 60);
+    if(时 < 24) return 时 + " 小时前";
+    const 天 = Math.floor(时 / 24);
+    return 天 < 30 ? 天 + " 天前" : new Date(t).toLocaleDateString("zh-CN");
+  };
+  板.innerHTML = 列.map(x => `
+    <button type="button" class="历史项" data-码="${x.代码}" data-名="${(x.名称||"").replace(/"/g,"&quot;")}">
+      <span class="码">${x.代码}</span>
+      <span class="名">${x.名称 || "—"}</span>
+      <span class="名" style="flex:none; font-size:10.5px; color:#98a2b3;">${多久(x.时间)}</span>
+      <span class="删" data-删="${x.代码}" title="删除这条">✕</span>
+    </button>`).join("") +
+    `<div class="历史底"><button type="button" id="清历史">清空全部</button></div>`;
+}
+
+let 板开着 = false;
+function 开历史板(){
+  刷新历史板();
+  取("历史板").hidden = false;
+  取("历史钮").classList.add("开");
+  板开着 = true;
+  摆历史板();
+}
+function 关历史板(){
+  取("历史板").hidden = true;
+  取("历史钮").classList.remove("开");
+  板开着 = false;
+}
+
+/* ═══════════ 主流程 ═══════════ */
+function 计算(数据){
+  const r = 回测(数据.区内, +取("初始金额").value || 20000, +取("百分点金额").value || 10000, 数据.基准昨收, +取("底仓金额").value || (+取("初始金额").value || 20000), +取("投入上限").value || 0, 手续费万, +取("持仓上限").value || 0, +取("卖出倍数").value || 1);
+  if(数据.名称) 取("名称").value = 数据.名称;   /* 联网成功 → 名称自动变更 */
+  当前结果 = r; 当前名称 = 取("名称").value || "ETF";
+  取("标题文字").textContent = `${当前名称}（${取("代码").value}）网格交易策略回测`;
+  /* 副标题按「实际取到的数据区间」显示，避免请求 10 年、实际只算 1 年却看不出来 */
+  const 实际 = 数据.区内;
+  const 首 = 实际[0][0], 末 = 实际[实际.length-1][0];
+  取("副标题").textContent = `${首} 至 ${末} · 共 ${实际.length} 个交易日 · 高抛低吸逆向网格 · 每日收盘信号逐日模拟`;
+  渲染汇总(r, 数据.区内); 渲染图(数据.区内, r.行); 渲染表(r.行);
+  渲染方案(r, 数据.区内);                     /* 同步刷新东财自动触发方案 */
+  window.__行情__ = 数据;
+  标净();                                     /* 计算完成：按钮复位、记录参数快照 */
+  记历史(取("代码").value, 数据.名称 || 取("名称").value);   /* 落一条历史，供下拉复用 */
+  /* 计算完成：参数落本机 + 自动推云端（换手机同步） */
+  try{ var p=收集参数(); if(p){ localStorage.setItem("gm_params_v2", JSON.stringify(p)); if(云后端地址 && 云口令) 云推(); } }catch(e){}
+}
+
+/* 数据指纹：区内交易日+收盘价序列拼接，用于静默刷新时判断数据是否真的变了 */
+function 取指纹(区内){
+  return 区内.length + "|" + 区内.map(x => x[0] + "=" + x[1]).join(",");
+}
+let 上次数据指纹 = null;
+
+async function 重新拉取(静默 = false){
+  const 状态 = 取("数据源状态");
+  const 起 = (取("起始").value || "").trim(), 止 = (取("结束").value || "").trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(起) || !/^\d{4}-\d{2}-\d{2}$/.test(止) || 起 > 止){
+    状态.className = "src off";
+    状态.innerHTML = `✕ <b>日期无效</b>：请确认起止日期均已选择，且起始不晚于结束`;
+    return;
+  }
+  /* 静默模式（定时轮询）：不写「正在拉取」状态，避免每轮都闪状态栏；数据无变化时全程零重绘 */
+  if(!静默){ 状态.className = "src"; 状态.innerHTML = "⏳ 正在并行拉取行情…"; }
+  const 计时起 = performance.now();
+  try{
+    const 数据 = await 拉取行情(取("代码").value.trim(), 起, 止);
+    快照模式 = false;
+    const 秒 = ((performance.now() - 计时起) / 1000).toFixed(2);
+    const 指纹 = 取指纹(数据.区内);
+    if(静默 && 指纹 === 上次数据指纹) return;   /* 数据无变化：跳过重绘，杜绝闪屏 */
+    上次数据指纹 = 指纹;
+    /* 数据被接口截断时（请求起始日早于实际首日），明确提示而非静默少算 */
+    if(数据.缺口){
+      const 缺 = 数据.缺口;
+      状态.className = "src off";
+      /* 数据从区间首日之后才开始，多数情况是该标的上市日较晚（如新 ETF），
+         并非接口故障。写清楚让用户知道该改起始日，而不是反复重试。 */
+      状态.innerHTML = `△ <b>实际数据自 ${缺.实际起} 起</b>：你选的起始日是 ${缺.请求起}，` +
+        `但该标的此前没有行情（多半是尚未上市）。本次按 ${缺.实际起} 至区间末日` +
+        `共 <b>${缺.条数}</b> 个交易日计算。若想看更早区间，请换成上市更早的标的。` +
+        `<span style="opacity:.72">（耗时 ${秒} 秒）</span>`;
+    }else if(数据.警告){
+      状态.className = "src off";
+      状态.innerHTML = `△ <b>在线数据（部分不完整）</b>：${数据.警告.失败片} 个分片拉取失败` +
+        `（${数据.警告.首错}），已用其余分片计算，结果可能缺口。耗时 ${秒} 秒；` +
+        `可点按钮重试。`;
+    }else{
+      状态.innerHTML = `● <b>在线数据</b>：腾讯财经接口 · 并行分片拉取 · ` +
+        `耗时 <b>${秒}</b> 秒 · ${new Date().toLocaleTimeString("zh-CN")}`;
+    }
+    计算(数据);
+  }catch(e){
+    try{
+      快照模式 = true;
+      const 区内 = 快照.filter(([d]) => d <= 止 && d >= 起);
+      if(!区内.length) throw new Error("离线快照不含该区间");
+      /* 基准昨收 = 快照中区间前最后一个交易日（动态取，支持任意子区间） */
+      const 前置 = 快照.filter(([d]) => d < 起).slice(-1)[0];
+      const 指纹 = 取指纹(区内);
+      if(静默 && 指纹 === 上次数据指纹) return;   /* 静默轮询时快照无变化：零重绘 */
+      上次数据指纹 = 指纹;
+      状态.className = "src off";
+      状态.innerHTML = `▲ <b>离线快照</b>（在线拉取失败：${e.message}）· 数据时点 2026-10-02 · 已按当前参数重算`;
+      计算({基准昨收: 前置 ? 前置[1] : null, 区内});
+    }catch(e2){
+      状态.className = "src off";
+      状态.innerHTML = `✕ <b>拉取失败</b>：${e2.message}。请检查代码或日期区间`;
+    }
+  }
+}
+
+function 导出(){
+  if(!当前结果) return;
+  const 头 = ["日期","收盘价(元)","涨跌幅(%)","盘前持仓市值(元)","当日盈亏金额(元)","当日买卖金额(元)","当日买卖份额(份)","买卖方向","持仓份额(份)","持仓每份成本价(元)","累计持仓收益率(%)","累计持仓收益(元)","盘后持仓市值(元)","累计投入现金(元)"];
+  const 行s = 当前结果.行.map(r => [r.日期, r.收盘, r.涨跌幅??"", r.盘前市值, r.当日盈亏, r.买卖金额, r.买卖份额, r.动作||"", r.份额, r.成本||"", r.收益率??"", r.收益, r.盘后市值, r.净投入].join(","));
+  const 内容 = "\uFEFF" + [当前名称 + "（" + 取("代码").value + "）网格交易策略回测明细", 头.join(","), ...行s].join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([内容], {type:"text/csv;charset=utf-8"}));
+  a.download = `网格交易回测_${取("代码").value}_${取("起始").value}_${取("结束").value}.csv`;
+  a.click();
+}
+
+/* 导出电子表格兼容文件（网页表格 → 电子表格格式，无需联网/第三方库，电子表格软件可直接打开） */
+function 导出电子表格(){
+  if(!当前结果) return;
+  const 末 = 当前结果.行[当前结果.行.length-1];
+  const 占用峰 = 当前结果.行.reduce((m, x) => x.净投入 > m.值 ? {值:x.净投入, 日:x.日期} : m, {值:-Infinity, 日:""});
+  const 峰占用 = 占用峰.值 < 0 ? 0 : 占用峰.值;
+  const 峰占用日 = 占用峰.值 < 0 ? "—" : 占用峰.日;
+  let 累亏 = null, 累盈 = null, 当亏 = null, 当盈 = null, 最买 = null, 最卖 = null;
+  for(const x of 当前结果.行){
+    if(累亏 === null || x.收益 < 累亏.收益) 累亏 = x;
+    if(累盈 === null || x.收益 > 累盈.收益) 累盈 = x;
+    if(当亏 === null || x.当日盈亏 < 当亏.当日盈亏) 当亏 = x;
+    if(当盈 === null || x.当日盈亏 > 当盈.当日盈亏) 当盈 = x;
+    if(x.买额 > 0 && (最买 === null || x.买额 > 最买.买额)) 最买 = x;
+    if(x.卖额 > 0 && (最卖 === null || x.卖额 > 最卖.卖额)) 最卖 = x;
+  }
+  /* 底仓死拿不动 */
+  const 建仓0 = 当前结果.行[0];
+  const 底仓份 = 建仓0.买卖份额;
+  const 底仓成本 = 舍2(底仓份 * 建仓0.收盘);
+  const 底仓盈亏 = 舍2(底仓份 * 末.收盘 - 底仓成本);
+  const 底仓率 = 底仓成本 ? 舍2(底仓盈亏/底仓成本*100) : 0;
+  const 头 = ["日期","收盘价(元)","涨跌幅(%)","盘前持仓市值(元)","当日盈亏金额(元)","当日买卖金额(元)","当日买卖份额(份)","买卖方向","持仓份额(份)","每份成本价(元)","累计收益率(%)","累计收益(元)","盘后持仓市值(元)","累计投入现金(元)"];
+  const 行s = 当前结果.行.map(r => [r.日期, r.收盘, r.涨跌幅??"", r.盘前市值, r.当日盈亏, r.买卖金额, r.买卖份额, r.动作||"", r.份额, r.成本||"", r.收益率??"", r.收益, r.盘后市值, r.净投入]);
+  const 单元 = v => `<td>${v===null||v==="" ? "—" : v}</td>`;
+  const 表 = "<table border='1' cellpadding='4' cellspacing='0'>" +
+    "<thead><tr>" + 头.map(h=>`<th>${h}</th>`).join("") + "</tr></thead><tbody>" +
+    行s.map(行 => "<tr>" + 行.map(单元).join("") + "</tr>").join("") + "</tbody></table>";
+  const 参数 = `<p style="font-family:sans-serif;font-size:12px;color:#555">` +
+    `标的：${当前名称}（${取("代码").value}）　区间：${取("起始").value} ~ ${取("结束").value}　` +
+    `初始投入：${取("初始金额").value} 元　每1%金额：${取("百分点金额").value} 元</p>` +
+    `<p style="font-family:sans-serif;font-size:12px;color:#555">` +
+    `期末累计收益：${带号金额(末.收益)}　累计收益率：${末.收益率}%（分母取 max(净投入, 初始投入)）　` +
+    `最大占用资金：${金额(峰占用)}（Σ买入−Σ卖出 峰值，峰值日：${峰占用日}）</p>` +
+    `<p style="font-family:sans-serif;font-size:12px;color:#555">` +
+    `累计最大亏损：${带号金额(累亏.收益)}（${累亏.日期}，持仓收益率 ${累亏.收益率}%）　累计最大盈利：${带号金额(累盈.收益)}（${累盈.日期}，持仓收益率 ${累盈.收益率}%）</p>` +
+    `<p style="font-family:sans-serif;font-size:12px;color:#555">` +
+    `当日最大亏损：${带号金额(当亏.当日盈亏)}（${当亏.日期}，当日涨跌幅 ${当亏.涨跌幅}%）　当日最大盈利：${带号金额(当盈.当日盈亏)}（${当盈.日期}，当日涨跌幅 ${当盈.涨跌幅}%）</p>` +
+    `<p style="font-family:sans-serif;font-size:12px;color:#555">` +
+    `当日最大买入：${金额(最买.买额)}（${最买.日期}，当日涨跌幅 ${最买.涨跌幅}%）　当日最大卖出：${金额(最卖.卖额)}（${最卖.日期}，当日涨跌幅 ${最卖.涨跌幅}%）</p>` +
+    `<p style="font-family:sans-serif;font-size:12px;color:#555">` +
+    `底仓死拿不动：${带号金额(底仓盈亏)}（建仓 ${底仓份} 份持有至期末，收益率 ${底仓率}%）</p>`;
+  const 内容 = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"></head><body>` +
+    `<h2 style="font-family:sans-serif">${当前名称}（${取("代码").value}）网格交易策略回测</h2>` +
+    参数 + 表 + `</body></html>`;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([内容], {type:"application/vnd.ms-excel"}));
+  a.download = `网格交易回测_${取("代码").value}_${取("起始").value}_${取("结束").value}.xls`;
+  a.click();
+}
+
+/* ═══════════ 自绘日期选择器（替代手机/桌面原生日期弹窗） ═══════════ */
+const 补零 = n => String(n).padStart(2, "0");
+const 日串 = (年, 月, 日) => `${年}-${补零(月)}-${补零(日)}`;
+const 今日串 = () => { const d = new Date(); return 日串(d.getFullYear(), d.getMonth() + 1, d.getDate()); };
+
+const 日期器 = {
+  目标: null, 年: 2026, 月: 6, 层: "日历", 年页: 2016, 开放时刻: 0,
+
+  打开(输入框){
+    this.目标 = 输入框;
+    const v = (输入框.value || "").trim();
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(v + "T00:00:00") : new Date();
+    this.年 = d.getFullYear(); this.月 = d.getMonth() + 1;
+    this.年页 = Math.floor(this.年 / 12) * 12;
+    this.层 = "日历";
+    取("选中提示").textContent = v || "未选择";
+    取("日期遮罩").hidden = false;
+    this.开放时刻 = Date.now();
+    this.绘制();
+  },
+  关闭(){ 取("日期遮罩").hidden = true; this.目标 = null; },
+
+  绘制(){
+    const 日历中 = this.层 === "日历";
+    取("星期行").hidden = !日历中;
+    取("日格网").hidden = !日历中;
+    取("年网格").hidden = this.层 !== "年";
+    取("月网格").hidden = this.层 !== "月";
+    取("箭上").hidden = this.层 === "月";
+    取("箭下").hidden = this.层 === "月";
+    取("年月钮").textContent = 日历中 ? `${this.年} 年 ${this.月} 月`
+      : (this.层 === "年" ? `${this.年页} – ${this.年页 + 11} 年` : `${this.年} 年 · 请选择月份`);
+    if(日历中) this.画日历();
+    if(this.层 === "年") this.画年();
+    if(this.层 === "月") this.画月();
+  },
+
+  画日历(){
+    const 偏移 = (new Date(this.年, this.月 - 1, 1).getDay() + 6) % 7;   /* 周一为第 0 列 */
+    const 本月 = new Date(this.年, this.月, 0).getDate();
+    const 上月 = new Date(this.年, this.月 - 1, 0).getDate();
+    const 邻月 = (方向, 日) => { const d = new Date(this.年, this.月 - 1 + 方向, 日);
+      return 日串(d.getFullYear(), d.getMonth() + 1, d.getDate()); };
+    const 今 = 今日串(), 选 = (this.目标?.value || "").trim();
+    const 格 = [];
+    for(let i = 偏移; i > 0; i--) 格.push({日: 上月 - i + 1, 他月: true, 值: 邻月(-1, 上月 - i + 1)});
+    for(let 日 = 1; 日 <= 本月; 日++) 格.push({日, 他月: false, 值: 日串(this.年, this.月, 日)});
+    for(let 日 = 1; 格.length % 7 !== 0 || 格.length < 35; 日++) 格.push({日, 他月: true, 值: 邻月(1, 日)});
+    取("日格网").innerHTML = 格.map(g => {
+      const 类 = [g.他月 ? "他月" : "", g.值 === 今 ? "今天" : "", g.值 === 选 ? "选中" : ""].filter(Boolean).join(" ");
+      return `<button class="日格 ${类}" data-值="${g.值}" title="${g.值}">${g.日}</button>`;
+    }).join("");
+  },
+  画年(){
+    取("年网格").innerHTML = Array.from({length: 12}, (_, i) => this.年页 + i)
+      .map(年 => `<button class="年格 ${年 === this.年 ? "选中" : ""}" data-年="${年}">${年}</button>`).join("");
+  },
+  画月(){
+    取("月网格").innerHTML = Array.from({length: 12}, (_, i) => i + 1)
+      .map(月 => `<button class="月格 ${月 === this.月 ? "选中" : ""}" data-月="${月}">${月} 月</button>`).join("");
+  },
+
+  选定(值){
+    const 目标 = this.目标, 谁 = 目标 ? 目标.id : "";
+    if(目标) 目标.value = 值;
+    this.关闭();
+    if(谁) 日期变更(谁);
+  }
+};
+
+/* 选定日期后的联动：保证 起始 ≤ 结束，然后标脏等待用户点主按钮。
+   与其余参数保持一致——所有改动都只标脏，不自动重拉，由用户统一触发。 */
+function 日期变更(谁){
+  const 起 = 取("起始").value, 止 = 取("结束").value;
+  if(起 && 止 && 起 > 止){
+    if(谁 === "起始") 取("结束").value = 起;
+    else              取("起始").value = 止;
+  }
+  标脏();
+}
+
+/* 输入框：只读 + inputmode=none 已阻止键盘；点击唤起自绘面板 */
+["起始", "结束"].forEach(id => {
+  const 格 = 取(id);
+  格.addEventListener("click", () => 日期器.打开(格));
+});
+
+/* 面板交互 */
+取("日格网").addEventListener("click", e => {
+  const 钮 = e.target.closest(".日格");
+  if(!钮) return;
+  const 值 = 钮.dataset.值;
+  日期器.年 = +值.slice(0, 4); 日期器.月 = +值.slice(5, 7);
+  日期器.选定(值);
+});
+取("年网格").addEventListener("click", e => {
+  const 钮 = e.target.closest(".年格");
+  if(!钮) return;
+  日期器.年 = +钮.dataset.年; 日期器.年页 = Math.floor(日期器.年 / 12) * 12;
+  日期器.层 = "月"; 日期器.绘制();
+});
+取("月网格").addEventListener("click", e => {
+  const 钮 = e.target.closest(".月格");
+  if(!钮) return;
+  日期器.月 = +钮.dataset.月;
+  日期器.层 = "日历"; 日期器.绘制();
+});
+取("年月钮").addEventListener("click", () => {
+  日期器.层 = 日期器.层 === "日历" ? "年" : (日期器.层 === "年" ? "月" : "日历");
+  日期器.绘制();
+});
+取("箭上").addEventListener("click", () => {
+  if(日期器.层 === "年") 日期器.年页 -= 12;
+  else { 日期器.月--; if(日期器.月 < 1){ 日期器.月 = 12; 日期器.年--; } }
+  日期器.绘制();
+});
+取("箭下").addEventListener("click", () => {
+  if(日期器.层 === "年") 日期器.年页 += 12;
+  else { 日期器.月++; if(日期器.月 > 12){ 日期器.月 = 1; 日期器.年++; } }
+  日期器.绘制();
+});
+取("今天钮").addEventListener("click", () => 日期器.选定(今日串()));
+取("关闭钮").addEventListener("click", () => 日期器.关闭());
+取("日期遮罩").addEventListener("pointerdown", e => {
+  /* 用 pointerdown 而非 click：同一手势的合成 click 不会再穿透关闭面板，彻底避免闪退 */
+  if(e.target === 取("日期遮罩") && Date.now() - 日期器.开放时刻 > 150) 日期器.关闭();
+});
+document.addEventListener("keydown", e => { if(e.key === "Escape" && !取("日期遮罩").hidden) 日期器.关闭(); });
+
+/* ═══════════ 自动触发方案：把回测参数换算成东财条件单数字 ═══════════ */
+
+/* 取最近交易日（区内），用于「基准价」——东财条件单是相对当前价设档位的 */
+function 末交易日(行){
+  return 行 && 行.length ? 行[行.length-1] : null;
+}
+
+/* 由成交金额反推股数：A 股最小 100 股，四舍五入到整手，至少 1 手 */
+function 股数(金额, 价){
+  if(!价 || !金额) return 0;
+  return Math.max(100, Math.round(金额/价/100)*100);
+}
+
+function 渲染方案(r, 行情){
+  const 末 = 末交易日(r.行);
+  if(!末) return;
+  const 代码 = 取("代码").value.trim();
+  const 名称 = 取("名称").value.trim() || "标的";
+  const 基准价 = 末.收盘;                                  /* 以回测末日收盘为网格基准 */
+  const 每档金额 = +取("百分点金额").value || 10000;         /* 每 1% 的交易金额 */
+  const 底仓额 = +取("底仓金额").value || 0;
+  const 初始额 = +取("初始金额").value || 0;
+
+  const 买股 = 股数(每档金额, 基准价);
+  const 卖股 = 股数(每档金额, 基准价);
+  const 底仓股 = 股数(底仓额, 基准价);
+  const 建仓股 = 股数(初始额, 基准价);
+
+  /* 网格上下限：既要贴合回测区间的真实波动，又必须把基准价包在中间。
+     取区间收盘价的 5% / 95% 分位作为自然边界，再对基准价做一次外扩——
+     末端若是冲高/杀跌结束，分位边界可能落在基准价同侧，那样上沿或下沿档位
+     永远不会被触发，网格等于被削掉一半。这里保证上下限各距基准价至少 5%。 */
+  const 收盘列 = 行情.map(x => x[1]).filter(v => typeof v === "number").sort((a,b) => a-b);
+  const 分位 = p => 收盘列.length ? 收盘列[Math.min(收盘列.length-1, Math.floor(收盘列.length*p))] : 基准价;
+  const 下沿 = 舍2(Math.min(分位(0.05), 基准价*0.95));
+  const 上沿 = 舍2(Math.max(分位(0.95), 基准价*1.05));
+  const 区间涨跌 = 舍2((末.收盘/行情[0][1] - 1)*100);
+
+  const 格 = [
+    ["网格基准价", 基准价.toFixed(3) + " 元", "回测末日（" + 末.日期 + "）收盘价，东财填「基准价」", "蓝"],
+    ["网格步长", "1%", "每跌 1% 买、每涨 1% 卖，与回测口径一致", "紫"],
+    ["每格买入股数", 买股.toLocaleString() + " 股", "≈ " + 金额(每档金额) + " ÷ 基准价，整手取整", "红"],
+    ["每格卖出股数", 卖股.toLocaleString() + " 股", "同上；东财智能网格若只填一个数量，就填这个数", "绿"],
+    ["建仓股数（首批）", 建仓股.toLocaleString() + " 股", "对应初始投入 " + 金额(初始额), "橙"],
+    ["底仓保护股数", 底仓股.toLocaleString() + " 股", "卖出后至少留这么多股，跌破即停止卖出", "橙"],
+    ["建议价格下限", 下沿.toFixed(3) + " 元", "回测区间低分位并保证低于基准价，跌破可考虑暂停网格", "灰"],
+    ["建议价格上限", 上沿.toFixed(3) + " 元", "回测区间高分位并保证高于基准价，涨破可按计划止盈", "灰"],
+    ["区间内标的涨跌", 带号(区间涨跌) + "%", 行情[0][0] + " → " + 末.日期 + " 收盘价变化", "灰"],
+  ];
+
+  取("方案格").innerHTML = 格.map(([名, 值, 注, 色], i) =>
+    `<div class="格子 调_${色}${i === 格.length - 1 ? " 末张" : ""}"><div class="名">${名}</div><div class="值">${值}</div><div class="注">${注}</div></div>`
+  ).join("");
+
+  /* 阶梯表：只列基准价上下各 5 档，够挂一轮；每档给触发价与股数，直接照填 */
+  const 档s = [];
+  for(let k = 5; k >= 1; k--) 档s.push({方向:"买", 档位:-k});
+  档s.push({方向:"—", 档位:0});
+  for(let k = 1; k <= 5; k++) 档s.push({方向:"卖", 档位:k});
+
+  取("阶梯区").innerHTML = `<div class="阶梯框"><table>
+    <thead><tr>
+      <th>方向</th><th>相对基准</th><th>触发价格（元）</th><th>委托数量</th><th>东财条件单设置</th>
+    </tr></thead><tbody>
+    ${档s.map(({方向, 档位}) => {
+      const 触发价 = 舍3(基准价 * (1 + 档位/100));
+      if(方向 === "—") return `<tr><td colspan="5" style="color:var(--ink2);background:color-mix(in srgb,var(--gold) 12%,transparent);font-weight:700">
+        当前基准价 ${基准价.toFixed(3)} 元（${末.日期} 收盘）</td></tr>`;
+      const 量 = 方向 === "买" ? 买股 : 卖股;
+      const 设 = 方向 === "买"
+        ? `价格下穿 ${触发价.toFixed(3)} → 买入 ${量.toLocaleString()} 股`
+        : `价格上穿 ${触发价.toFixed(3)} → 卖出 ${量.toLocaleString()} 股`;
+      return `<tr>
+        <td class="${方向==='买'?'act-buy':'act-sell'}" style="font-weight:700">${方向 === "买" ? "↓ 买入" : "↑ 卖出"}</td>
+        <td>${档位 > 0 ? "+" : ""}${档位}%</td>
+        <td style="font-weight:700">${触发价.toFixed(3)}</td>
+        <td>${量.toLocaleString()} 股</td>
+        <td style="text-align:left;color:var(--ink2)">${设}</td>
+      </tr>`;
+    }).join("")}
+    </tbody></table></div>`;
+
+  /* 提醒：口径差异 + 资金占用，避免照抄后资金不够 */
+  const 满格资金 = 买股 * 基准价 * 5 + 建仓股 * 基准价;
+  取("方案提醒").innerHTML =
+    `<b>资金提醒</b>：若下方 5 个买档全部触发，加上首批建仓，合计需准备约 <b>${金额(满格资金)}</b>` +
+    `（建仓 ${金额(建仓股*基准价)} + 5 档买入 ${金额(买股*基准价*5)}）。` +
+    `若资金不够，把「每 1% 交易金额」调小，或减少挂单档数。<br>` +
+    `<b>口径差异</b>：本工具按<b>收盘价</b>出信号，东财条件单按<b>盘中实时价</b>触发；` +
+    `日内震荡时东财会多触发，单边跳空时可能少触发，长期统计应大致接近但不会逐笔一致。`;
+}
+
+/* 复制全部参数：拼成纯文本，可直接粘进手机备忘录再对着填 */
+function 复制方案(){
+  if(!当前结果){ alert("请先点「重新拉取行情并计算」，有结果后才能生成方案。"); return; }
+  const 末 = 末交易日(当前结果.行);
+  const 名称 = 取("名称").value.trim() || "标的";
+  const 代码 = 取("代码").value.trim();
+  const 基准价 = 末.收盘;
+  const 每档金额 = +取("百分点金额").value || 10000;
+  const 买股 = 股数(每档金额, 基准价);
+  const 收盘列 = 当前结果.行.map(x => x.收盘).sort((a,b) => a-b);
+  const 分位 = p => 收盘列[Math.min(收盘列.length-1, Math.floor(收盘列.length*p))];
+  const 下沿 = 舍3(Math.min(分位(0.05), 基准价*0.95));
+  const 上沿 = 舍3(Math.max(分位(0.95), 基准价*1.05));
+
+  const 行s = [];
+  行s.push(`【${名称}（${代码}）东方财富条件单参数】`);
+  行s.push(`基准价：${基准价.toFixed(3)} 元（${末.日期} 收盘）`);
+  行s.push(`网格步长：1%（每跌 1% 买、每涨 1% 卖）`);
+  行s.push(`每格买入：${买股} 股`);
+  行s.push(`每格卖出：${买股} 股`);
+  行s.push(`建仓股数：${股数(+取("初始金额").value||0, 基准价)} 股`);
+  行s.push(`底仓保护：${股数(+取("底仓金额").value||0, 基准价)} 股（跌破停止卖出）`);
+  行s.push(`价格下限：${下沿.toFixed(3)} 元　价格上限：${上沿.toFixed(3)} 元`);
+  行s.push(`— 买入档 —`);
+  for(let k = 1; k <= 5; k++){
+    行s.push(`跌 ${k}%：${舍3(基准价*(1-k/100)).toFixed(3)} 元 → 买 ${买股} 股`);
+  }
+  行s.push(`— 卖出档 —`);
+  for(let k = 1; k <= 5; k++){
+    行s.push(`涨 ${k}%：${舍3(基准价*(1+k/100)).toFixed(3)} 元 → 卖 ${买股} 股`);
+  }
+  行s.push(`（回测区间 ${行情首末(当前结果.行)}）`);
+
+  const 文 = 行s.join("\n");
+  const 钮 = 取("复制方案");
+  const 落定 = () => { 钮.classList.add("成了"); 钮.textContent = "✓ 已复制"; 
+    clearTimeout(钮._恢复); 钮._恢复 = setTimeout(() => { 钮.classList.remove("成了"); 钮.textContent = "⧉ 复制全部参数"; }, 1800); };
+
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(文).then(落定).catch(() => 退回复制(文, 落定));
+  }else 退回复制(文, 落定);
+}
+
+/* 剪贴板接口不可用（本地文件、非安全上下文）时的兜底：用隐藏文本框 + 选中复制 */
+function 退回复制(文, 落定){
+  const 框 = document.createElement("textarea");
+  框.value = 文; 框.style.position = "fixed"; 框.style.opacity = "0";
+  document.body.appendChild(框); 框.select();
+  try{ document.execCommand("copy"); 落定(); }
+  catch(e){ alert("复制失败，请手动选中方案卡内的文字复制。"); }
+  document.body.removeChild(框);
+}
+
+function 行情首末(行s){ return 行s.length ? `${行s[0].日期} ~ ${行s[行s.length-1].日期}` : "—"; }
+
+document.addEventListener("click", e => {
+  if(e.target.closest("#复制方案")) 复制方案();
+});
+
+/* ═══════════ 独立窗口识别 ═══════════
+   本应用以 PWA 方式交付：添加到主屏幕后从桌面图标启动，
+   浏览器自动以独立窗口呈现，地址栏与工具栏都不存在——本身就是全屏。
+   这里只做一件事：确认当前跑在独立窗口里，给它挂上类名，
+   让 CSS 生效安全区适配，避开刘海与底部手势条。 */
+(function(){
+  const 独立 = window.matchMedia("(display-mode: standalone)").matches ||
+    window.matchMedia("(display-mode: fullscreen)").matches ||
+    window.matchMedia("(display-mode: minimal-ui)").matches ||
+    window.navigator.standalone === true;
+  if(独立) document.body.classList.add("独立窗口");
+})();
+
+/* ═══════════ 悬空胶囊导航栏 ═══════════ */
+(function(){
+  const 导航 = 取("胶囊导航");
+  const 项s = [...导航.querySelectorAll(".胶囊项")];
+  if(!导航 || !项s.length) return;
+
+  /* 导航常显：仅回到页面最顶部时淡出，避免遮挡标题 */
+  const 观察顶 = () => {
+    导航.classList.toggle("收起", window.scrollY < 70);
+  };
+  window.addEventListener("scroll", 观察顶, {passive:true});
+  观察顶();
+
+  /* 高亮切换：先定义，供点击与滚动判定共用 */
+  const 点亮 = id => 项s.forEach(钮 => 钮.classList.toggle("选中", 钮.dataset.区 === id));
+
+  /* 点击 → 平滑滚动到对应区块。
+     滚动过程中暂时锁定高亮，避免动画途中被自动判定覆盖；到位后解除锁定。 */
+  let 锁定 = null;
+  项s.forEach(钮 => 钮.addEventListener("click", () => {
+    const 区 = 钮.dataset.区;
+    if(区 === "顶"){
+      锁定 = null;
+      window.scrollTo({top:0, behavior:"smooth"});
+      return;
+    }
+    const 目标 = 取(区);
+    if(!目标) return;
+    /* 顶部留 12px 呼吸空间，避免卡片贴着视口边缘 */
+    const 位 = 目标.getBoundingClientRect().top + window.scrollY - 12;
+    锁定 = 区;
+    点亮(区);
+    window.scrollTo({top: 位, behavior:"smooth"});
+    clearTimeout(钮._解锁);
+    钮._解锁 = setTimeout(() => { 锁定 = null; 算当前(); }, 700);
+  }));
+
+  /* 滚动联动高亮：以「区块顶部刚越过视口上部参考线」为准，
+     比按面积判定更贴合直觉——点了哪块、滚到哪块，就亮哪块 */
+  const 区块 = ["区_参数","区_汇总","区_走势","区_自动","区_明细"].map(id => 取(id)).filter(Boolean);
+  let 待执行 = false;
+  const 算当前 = () => {
+    待执行 = false;
+    if(锁定) return;                     /* 点击动画进行中，保持点击目标高亮 */
+    /* 滚到最底部时直接点亮「明细」，避免最后一屏因高度不足判不出来 */
+    const 到底 = window.innerHeight + window.scrollY >= document.body.scrollHeight - 8;
+    if(到底) return 点亮("区_明细");
+
+    /* 参考线取视口 1/3 处：区块顶越过它即视为"当前区块" */
+    const 参考线 = window.innerHeight * 0.34;
+    let 最佳 = 区块[0] ? 区块[0].id : null;
+    for(const el of 区块){
+      if(el.getBoundingClientRect().top <= 参考线) 最佳 = el.id;
+    }
+    if(最佳) 点亮(最佳);
+  };
+
+  window.addEventListener("scroll", () => {
+    if(待执行) return;
+    待执行 = true;
+    requestAnimationFrame(算当前);
+  }, {passive:true});
+  window.addEventListener("resize", 算当前);
+  算当前();
+})();
+
+/* ═══════════ 历史记录下拉：点击、键盘、外部点击关闭 ═══════════ */
+(function(){
+  const 格 = 取("代码"), 钮 = 取("历史钮"), 板 = 取("历史板");
+  if(!格 || !钮 || !板) return;
+
+  钮.addEventListener("click", e => {
+    e.stopPropagation();
+    板开着 ? 关历史板() : 开历史板();
+  });
+
+  /* 面板内点击：取用某条 / 删除某条 / 清空 */
+  板.addEventListener("click", e => {
+    e.stopPropagation();
+    const 删 = e.target.closest("[data-删]");
+    if(删){ 删历史(删.dataset.删); return; }
+    if(e.target.closest("#清历史")){ 清历史(); return; }
+    const 项 = e.target.closest(".历史项");
+    if(项) 用历史(项.dataset.码, 项.dataset.名);
+  });
+
+  /* 点空白处关闭；面板滚到外面也不挡操作 */
+  document.addEventListener("click", () => { if(板开着) 关历史板(); });
+  window.addEventListener("keydown", e => { if(e.key === "Escape" && 板开着) 关历史板(); });
+
+  /* 输入框聚焦时也把历史亮出来，方便直接挑 */
+  格.addEventListener("focus", () => { if(!板开着) 开历史板(); });
+  格.addEventListener("keydown", e => {
+    if(e.key === "Enter" && 板开着) 关历史板();
+  });
+
+  刷新历史板();
+})();
+
+/* 参数改动 → 统一标脏（按钮转橙 + 状态条提示差异），由用户点主按钮统一计算，行为一致可预期。 */
+
+/* ══════════ 顶栏四按钮 ══════════
+   语义与 A股选股看板 顶栏完全一致：
+     ① 主题 —— 深浅两态切换（不是三态）
+     ② 下载 —— 装到手机桌面（PWA 安装引导），不是下载文件
+     ③ 刷新 —— 拉取最新行情并重算，图标旋转
+     ④ 自动 —— 3 秒自动刷新开关
+   存储键 gm_theme（light/dark）、gm_auto（1/0）。 */
+
+/* ── 通用吐司提示 ── */
+let 吐司钟 = null;
+function 吐司(文案){
+  const 盒 = document.getElementById("吐司");
+  document.getElementById("吐司文").textContent = 文案;
+  盒.classList.add("显");
+  clearTimeout(吐司钟);
+  吐司钟 = setTimeout(() => 盒.classList.remove("显"), 2400);
+}
+
+/* ── ① 主题：三态循环（跟随系统 → 浅色 → 深色 → 跟随系统…）──
+   档位存 gm_theme：system / light / dark。
+   system 档下实时跟随系统偏好；锁定浅/深档后系统变化不再影响。 */
+const 主题顺序 = ["system", "light", "dark"];
+const 主题名 = {system: "跟随系统", light: "浅色", dark: "深色"};
+
+function 应用主题(档位){
+  const 根 = document.documentElement;
+  /* 跟随系统时实时解析成实际主题；锁定时直接用锁定值 */
+  const 实际 = 档位 === "system"
+    ? ((matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light")
+    : 档位;
+  根.dataset.theme = 实际;
+  根.dataset.themeMode = 档位;
+  /* 顶栏系统色跟随（安卓地址栏 / iOS 状态栏）*/
+  const 元 = document.querySelector('meta[name="theme-color"]');
+  if (元) 元.setAttribute("content", 实际 === "dark" ? "#11151c" : "#dbe8fb");
+  /* 提示语同步 */
+  const 钮 = document.getElementById("主题钮");
+  if (钮){
+    钮.title = "切换主题 · 当前：" + 主题名[档位];
+    钮.setAttribute("aria-label", 钮.title);
+  }
+  localStorage.setItem("gm_theme", 档位);
+}
+
+function 切换主题(){
+  const 当前 = document.documentElement.dataset.themeMode || "system";
+  const 下一个 = 主题顺序[(主题顺序.indexOf(当前) + 1) % 主题顺序.length];
+  应用主题(下一个);
+  吐司("已切换到" + 主题名[下一个]);
+}
+
+/* 系统主题变化时，仅在"跟随系统"档位下实时响应 */
+if (matchMedia){
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if ((document.documentElement.dataset.themeMode || "system") === "system") 应用主题("system");
+  });
+}
+
+/* 首屏：读存储；无存储默认跟随系统 */
+(function(){
+  const 存 = localStorage.getItem("gm_theme");
+  应用主题(主题顺序.includes(存) ? 存 : "system");
+})();
+
+document.getElementById("主题钮").onclick = 切换主题;
+
+/* ── ② 下载：装到手机桌面（PWA 安装引导，与看板一致）── */
+let 安装事件 = null;
+/* 地址要指向「这个工具的线上版」。
+   坑：本地文件（file://）打开时 location 拿到的是手机里的临时预览路径，
+   既装不了桌面也分享不了。按协议分流：线上用自身地址，本地文件给固定线上地址。 */
+const 线上地址 = "https://astock-grid.surge.sh/";
+function 取安装地址(){
+  try{
+    if (location.protocol === "http:" || location.protocol === "https:"){
+      return location.origin + location.pathname;
+    }
+  }catch(e){}
+  return 线上地址;
+}
+
+function 装平台(){const ua = navigator.userAgent || "";if (/iPhone|iPad|iPod/i.test(ua)) return "ios";if (/Android/i.test(ua)) return "android";return "desktop";}
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  安装事件 = e;
+  const 直 = document.getElementById("安装直装");
+  if (直) 直.textContent = "立即安装到桌面";
+});
+window.addEventListener("appinstalled", () => {
+  const 直 = document.getElementById("安装直装");
+  if (直){ 直.textContent = "已装到手机桌面"; 直.disabled = true; }
+  吐司("已装到主屏幕");
+});
+
+function 打开安装(){
+  const 址 = 取安装地址();
+  document.getElementById("安装网址").textContent = 址;
+  window.__安装址 = 址;
+  /* 本地文件打开时给一句提示：装桌面要认准线上地址 */
+  try{
+    const 本地 = !(location.protocol === "http:" || location.protocol === "https:");
+    const 提示 = document.getElementById("安装本地提示");
+    if (提示) 提示.style.display = 本地 ? "block" : "none";
+  }catch(e){}
+  document.getElementById("安装遮罩").classList.add("开");
+}
+document.getElementById("下载钮").onclick = 打开安装;
+document.getElementById("下载钮").setAttribute("title", "装到手机桌面");
+document.getElementById("下载钮").setAttribute("aria-label", "装到手机桌面");
+document.getElementById("安装关").onclick = () => document.getElementById("安装遮罩").classList.remove("开");
+document.getElementById("安装遮罩").addEventListener("click", e => {
+  if (e.target.id === "安装遮罩") e.target.classList.remove("开");
+});
+document.getElementById("安装复制").onclick = function(){
+  const t = document.createElement("textarea");
+  t.value = window.__安装址 || 线上地址;
+  document.body.appendChild(t);
+  t.select();
+  try{
+    document.execCommand("copy");
+    this.textContent = "已复制";
+    setTimeout(() => { this.textContent = "复制网址"; }, 1800);
+  }catch(e){ prompt("复制网址：", window.__安装址 || 线上地址); }
+  document.body.removeChild(t);
+};
+document.getElementById("安装直装").onclick = async function(){
+  const 直 = this;
+  /* 本地文件/预览器打开：跳转常被拦截，先复制线上地址保底再尝试跳转 */
+  try{
+    if (!(location.protocol === "http:" || location.protocol === "https:")){
+      try{
+        const t = document.createElement("textarea");
+        t.value = 线上地址; document.body.appendChild(t); t.select();
+        document.execCommand("copy"); document.body.removeChild(t);
+      }catch(err){}
+      吐司("线上地址已复制：打开浏览器粘贴访问，再点一次即可安装");
+      直.textContent = "已复制网址，请用浏览器打开";
+      setTimeout(() => { if (!直.disabled) 直.textContent = "一键装到手机桌面"; }, 3200);
+      try{ location.href = 线上地址; }catch(err){}
+      return;
+    }
+  }catch(e){}
+  if (安装事件){
+    安装事件.prompt();
+    let 选 = "";
+    try{ const r = await 安装事件.userChoice; 选 = r && r.outcome; }catch(e){}
+    安装事件 = null;
+    if (选 === "accepted"){ 直.textContent = "已装到手机桌面"; 直.disabled = true; }
+    else { 直.textContent = "已取消，可再点一次"; }
+    return;
+  }
+  const p = 装平台();
+  直.textContent = p === "ios" ? "iPhone：点底部「分享」→ 添加到主屏幕"
+    : (p === "android" ? "点浏览器菜单 ⋮ → 添加到主屏幕" : "点地址栏右侧「安装」图标");
+  setTimeout(() => { if (!直.disabled) 直.textContent = "一键装到手机桌面"; }, 2600);
+};
+
+/* ── ③ 刷新：拉最新行情并重算 ── */
+let 刷新中 = false;
+document.getElementById("刷新钮").onclick = async () => {
+  if (刷新中) return;
+  刷新中 = true;
+  const 图 = document.getElementById("刷新钮").querySelector("svg");
+  图.classList.add("转");
+  try{
+    await 重新拉取();
+    吐司("行情已刷新");
+  }catch(e){
+    吐司("刷新失败，请检查代码或日期区间");
+  }finally{
+    图.classList.remove("转");
+    刷新中 = false;
+  }
+};
+
+/* ═══════════ 云端同步（真后端 · 与看板共用 Worker + 云口令）═══════════ */
+var 云后端地址 = "";
+var 云口令 = "";
+var 云同步中 = false;
+var 云状态 = "";
+
+async function 云键(口令){
+  try{
+    var d = new TextEncoder().encode(口令 || "");
+    var h = await crypto.subtle.digest("SHA-256", d);
+    return Array.from(new Uint8Array(h)).map(function(b){ return b.toString(16).padStart(2,"0"); }).join("");
+  }catch(e){ return ""; }
+}
+
+function 收集参数(){
+  try{
+    return {
+      名称: (取("名称").value||"").trim(),
+      代码: (取("代码").value||"").trim(),
+      起始: (取("起始").value||""),
+      结束: (取("结束").value||""),
+      初始金额: +取("初始金额").value || 0,
+      底仓金额: +取("底仓金额").value || 0,
+      百分点金额: +取("百分点金额").value || 0,
+      投入上限: +取("投入上限").value || 0,
+      持仓上限: +取("持仓上限").value || 0,
+      卖出倍数: +取("卖出倍数").value || 1
+    };
+  }catch(e){ return null; }
+}
+
+function 回填参数(p){
+  if(!p || typeof p !== "object") return;
+  try{
+    if(p.名称!=null) 取("名称").value = p.名称;
+    if(p.代码!=null) 取("代码").value = p.代码;
+    if(p.起始!=null) 取("起始").value = p.起始;
+    if(p.结束!=null) 取("结束").value = p.结束;
+    if(p.初始金额!=null) 取("初始金额").value = p.初始金额;
+    if(p.底仓金额!=null) 取("底仓金额").value = p.底仓金额;
+    if(p.百分点金额!=null) 取("百分点金额").value = p.百分点金额;
+    if(p.投入上限!=null) 取("投入上限").value = p.投入上限;
+    if(p.持仓上限!=null) 取("持仓上限").value = p.持仓上限;
+    if(p.卖出倍数!=null) 取("卖出倍数").value = p.卖出倍数;
+    标脏();
+  }catch(e){}
+}
+
+async function 云推(){
+  if(云同步中) return false;
+  if(!云后端地址 || !云口令){ 云状态="未配置后端"; 云状态广播(); return false; }
+  云同步中=true; 云状态="同步中…"; 云状态广播();
+  try{
+    var k = await 云键(云口令); if(!k) return false;
+    var 参数 = 收集参数();
+    var 数据 = {};
+    if(参数) 数据.params = 参数;
+    var r = await fetch(云后端地址 + "/api/sync?k=" + k, {
+      method:"POST", headers:{"content-type":"application/json"},
+      body: JSON.stringify({ ver:Date.now(), data:数据 })
+    });
+    var j = await r.json();
+    if(j&&j.ok){ 云状态="已同步 "+new Date().toLocaleTimeString(); 云同步中=false; 云状态广播(); return true; }
+    云状态="同步失败："+((j&&j.err)||"未知"); 云同步中=false; 云状态广播(); return false;
+  }catch(e){ 云状态="同步异常："+(e&&e.message); 云同步中=false; 云状态广播(); return false; }
+}
+
+async function 云拉(){
+  if(!云后端地址||!云口令){ 云状态="未配置后端"; 云状态广播(); return null; }
+  云状态="拉取中…"; 云状态广播();
+  try{
+    var k = await 云键(云口令); if(!k) return null;
+    var r = await fetch(云后端地址 + "/api/sync?k=" + k);
+    var j = await r.json();
+    if(j&&j.ok){ 云状态="已是最新"; 云状态广播(); return (j.data && typeof j.data==="object")? j.data : null; }
+    云状态="拉取失败："+((j&&j.err)||"未知"); 云状态广播(); return null;
+  }catch(e){ 云状态="拉取异常："+(e&&e.message); 云状态广播(); return null; }
+}
+
+async function 云应用(云){
+  if(!云 || typeof 云!=="object") return false;
+  var 改=false;
+  if(云.params){ try{ localStorage.setItem("gm_params_v2", JSON.stringify(云.params)); 回填参数(云.params); 改=true; }catch(e){} }
+  return 改;
+}
+
+function 云状态广播(){ try{ if(typeof 刷新云状态==="function") 刷新云状态(); }catch(e){} }
+
+function 保存云配置(){ try{ localStorage.setItem("gm_cloud_cfg_v1", JSON.stringify({后端:云后端地址, 口令:云口令})); }catch(e){} }
+function 加载云配置(){ try{ var c=JSON.parse(localStorage.getItem("gm_cloud_cfg_v1")||"null"); if(c){ 云后端地址=c.后端||""; 云口令=c.口令||""; } }catch(e){} }
+
+async function 云一键同步(){
+  var 拉 = await 云拉(); if(拉) 云应用(拉);
+  try{ var p=收集参数(); if(p) localStorage.setItem("gm_params_v2", JSON.stringify(p)); }catch(e){}
+  await 云推();
+}
+
+function 刷新云状态(){
+  var el=document.getElementById("云状态文");
+  if(el){ el.textContent=云状态||""; el.className="云态"+(云状态&&云状态.indexOf("已同步")>=0?" ok":(云状态&&(云状态.indexOf("失败")>=0||云状态.indexOf("异常")>=0)?" err":"")); }
+}
+
+
+/* ── ④ 自动：5 分钟自动刷新开关（仅在页面可见且未聚焦他窗口时跑）── */
+let 自动刷新 = localStorage.getItem("gm_auto") !== "0";
+let 自动定时 = null;
+
+function 同步自动钮(){
+  const 钮 = document.getElementById("自动钮");
+  if (钮){
+    钮.classList.toggle("自动开", 自动刷新);
+    钮.title = 自动刷新 ? "自动刷新已开启（5分钟）" : "自动刷新已暂停";
+    钮.setAttribute("aria-label", 钮.title);
+  }
+}
+function 切换自动(){
+  自动刷新 = !自动刷新;
+  同步自动钮();
+  吐司(自动刷新 ? "自动刷新已开启：每5分钟一次" : "自动刷新已暂停");
+  localStorage.setItem("gm_auto", 自动刷新 ? "1" : "0");
+  if (!自动刷新 && 自动定时){ clearInterval(自动定时); 自动定时 = null; }
+}
+document.getElementById("自动钮").onclick = 切换自动;
+
+/* 5 分钟轮询（静默模式）：日线级回测无需更高频；后台标签页 / 窗口未聚焦都不跑，避免白烧 CPU */
+自动定时 = setInterval(() => {
+  if (!自动刷新) return;
+  if (document.hidden) return;
+  if (!document.hasFocus()) return;
+  /* 上一轮还没结束就跳过，防止请求堆积 */
+  if (刷新中) return;
+  if (document.getElementById("参数状态")?.classList.contains("已最新")){
+    刷新中 = true;
+    Promise.resolve(重新拉取(true)).catch(() => {}).finally(() => { 刷新中 = false; });
+  }
+}, 300000);
+
+同步自动钮();
+
+加载云配置();
+重新拉取();
+/* 云端同步：自动拉回参数（换手机恢复），不自动重算，等用户点主按钮 */
+try{ if(云后端地址 && 云口令){ 云拉().then(function(d){ if(d) 云应用(d); }).catch(function(){}); } }catch(e){}
+
+/* Service Worker 注册：HTTPS 下生效，满足浏览器"一键安装"条件 */
+if ("serviceWorker" in navigator && location.protocol === "https:"){
+  navigator.serviceWorker.register("./sw.js").catch(function(){});
+}
+</script>
+</body>
+</html>
