@@ -10,7 +10,7 @@
 
 | 设备 | 文件 | 开始时间 | 计划改动 | 预计完成 |
 |---|---|---|---|---|
-| — | — | — | （无占用时保留这一行占位） | — |
+| 电脑端 | `.github/workflows/deploy.yml`、`grid/manifest-grid.json`、`collab-log.md`、`collab-entry.md` | 2026-11-09 20:27 | 开启 push 自动部署：两个 Secret + deploy.yml + 触发器验证 + 回填台账 | 预计 30 分钟 |
 
 ---
 
