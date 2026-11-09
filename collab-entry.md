@@ -18,7 +18,7 @@
 |---|---|---|---|
 | ① 策略引擎 | 仓库根（`engine.js` 等） | 无独立域名，产物进仓库 | GitHub Actions 每交易日 14:05–14:45 五档 cron 自动跑，产出 `recs.json` / `today.json` / `watch.json`；15:30 跑 `review.js` 复盘与账户模拟 |
 | ② 看板 | `site/` | `astock-board-9t0.pages.dev` | 单文件 `index.html`（约 720KB），`functions/api/*.js` 7 个边缘代理，从 GitHub raw 读数 |
-| ③ 网格回测 | `grid/` | `astock-grid.surge.sh`（2026-11-10 杜哥定为正式入口，pages.dev 转为备份） | 单文件 `index.html`（约 132KB），跌买涨卖逆向网格，与另两个模块完全独立 |
+| ③ 网格回测 | `grid/` | `astock-grid.pages.dev`（2026-11-10 定为正式入口；surge 域名因账号密码不可用、OAuth 应用失效已无法部署，转为只读备份） | 单文件 `index.html`（约 132KB），跌买涨卖逆向网格，与另两个模块完全独立 |
 
 依赖关系：② 的数据全部来自 ①；③ 完全独立。
 

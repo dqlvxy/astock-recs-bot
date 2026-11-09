@@ -1812,7 +1812,7 @@ let 安装事件 = null;
 /* 地址要指向「这个工具的线上版」。
    坑：本地文件（file://）打开时 location 拿到的是手机里的临时预览路径，
    既装不了桌面也分享不了。按协议分流：线上用自身地址，本地文件给固定线上地址。 */
-const 线上地址 = "https://astock-grid.surge.sh/";
+const 线上地址 = "https://astock-grid.pages.dev/";
 function 取安装地址(){
   try{
     if (location.protocol === "http:" || location.protocol === "https:"){
