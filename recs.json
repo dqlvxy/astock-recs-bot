@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "updated": "2026-11-09 06:58:11",
-  "count": 22,
+  "updated": "2026-11-10 14:42:37",
+  "count": 23,
   "recs": [
     {
       "date": "20261008",
@@ -7313,6 +7313,177 @@
           "买点等级": "三等",
           "等级名": "底背离",
           "等级补录": "买点反推"
+        }
+      ]
+    },
+    {
+      "date": "20261110",
+      "gen_time": "2026-11-10 14:42:37",
+      "picks": [
+        {
+          "code": "600121",
+          "name": "郑州煤电",
+          "prob": 61.6,
+          "score": 6,
+          "buy_price": 4.37,
+          "stop_loss": 4.02,
+          "industry": "",
+          "buy_type": "强势延续(B6)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红2天 · 形态加分 6 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 2,
+          "买点等级": "二等",
+          "等级名": "强势延续",
+          "is_main": false,
+          "pct": 5.29,
+          "pct_chg": 5.29,
+          "turnover": 18.48,
+          "vol_ratio": 2.36,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 18.9,
+          "price": 4.98,
+          "float_mv": 6068000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "603712",
+          "name": "七一二",
+          "prob": 62.7,
+          "score": 7,
+          "buy_price": 11.94,
+          "stop_loss": 10.98,
+          "industry": "",
+          "buy_type": "底背离买(B5)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红2天 · 形态加分 7 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 3,
+          "买点等级": "三等",
+          "等级名": "底背离",
+          "is_main": false,
+          "pct": 0,
+          "pct_chg": 0,
+          "turnover": 1.91,
+          "vol_ratio": 0.87,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 6.1,
+          "price": 12.28,
+          "float_mv": 9480000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "600633",
+          "name": "浙数文化",
+          "prob": 62.7,
+          "score": 7,
+          "buy_price": 10.82,
+          "stop_loss": 9.95,
+          "industry": "",
+          "buy_type": "底背离买(B5)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红5天 · 形态加分 7 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 3,
+          "买点等级": "三等",
+          "等级名": "底背离",
+          "is_main": false,
+          "pct": 2.27,
+          "pct_chg": 2.27,
+          "turnover": 2.13,
+          "vol_ratio": 0.71,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 5.6,
+          "price": 11.28,
+          "float_mv": 14304000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "600650",
+          "name": "锦江在线",
+          "prob": 62.7,
+          "score": 7,
+          "buy_price": 10.25,
+          "stop_loss": 9.43,
+          "industry": "",
+          "buy_type": "底背离买(B5)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红4天 · 形态加分 7 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 3,
+          "买点等级": "三等",
+          "等级名": "底背离",
+          "is_main": false,
+          "pct": 1.9,
+          "pct_chg": 1.9,
+          "turnover": 2.4,
+          "vol_ratio": 1.06,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 8.6,
+          "price": 10.7,
+          "float_mv": 4179000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "301010",
+          "name": "晶雪节能",
+          "prob": 62.7,
+          "score": 7,
+          "buy_price": 22.03,
+          "stop_loss": 20.27,
+          "industry": "",
+          "buy_type": "底背离买(B5)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红2天 · 形态加分 7 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 3,
+          "买点等级": "三等",
+          "等级名": "底背离",
+          "is_main": false,
+          "pct": 0.31,
+          "pct_chg": 0.31,
+          "turnover": 25.73,
+          "vol_ratio": 1.45,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 21.6,
+          "price": 26.29,
+          "float_mv": 2839000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
         }
       ]
     }
