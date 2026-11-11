@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "updated": "2026-11-10 14:42:37",
-  "count": 23,
+  "updated": "2026-11-11 13:58:08",
+  "count": 24,
   "recs": [
     {
       "date": "20261008",
@@ -7482,6 +7482,177 @@
           "pct_chg_5d": 21.6,
           "price": 26.29,
           "float_mv": 2839000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        }
+      ]
+    },
+    {
+      "date": "20261111",
+      "gen_time": "2026-11-11 13:58:08",
+      "picks": [
+        {
+          "code": "002036",
+          "name": "联创电子",
+          "prob": 66,
+          "score": 10,
+          "buy_price": 5.33,
+          "stop_loss": 4.9,
+          "industry": "",
+          "buy_type": "强势延续(B6)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红4天 · 形态加分 10 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 2,
+          "买点等级": "二等",
+          "等级名": "强势延续",
+          "is_main": false,
+          "pct": 5.99,
+          "pct_chg": 5.99,
+          "turnover": 9.41,
+          "vol_ratio": 3.19,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 14.9,
+          "price": 6.02,
+          "float_mv": 6354000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "600556",
+          "name": "天下秀",
+          "prob": 62.7,
+          "score": 7,
+          "buy_price": 4.85,
+          "stop_loss": 4.46,
+          "industry": "",
+          "buy_type": "底背离买(B5)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红5天 · 形态加分 7 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 3,
+          "买点等级": "三等",
+          "等级名": "底背离",
+          "is_main": false,
+          "pct": 5.61,
+          "pct_chg": 5.61,
+          "turnover": 16.69,
+          "vol_ratio": 3.39,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 14.2,
+          "price": 5.46,
+          "float_mv": 9870000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "603375",
+          "name": "盛景微",
+          "prob": 62.7,
+          "score": 7,
+          "buy_price": 41.87,
+          "stop_loss": 38.52,
+          "industry": "",
+          "buy_type": "底背离买(B5)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红5天 · 形态加分 7 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 3,
+          "买点等级": "三等",
+          "等级名": "底背离",
+          "is_main": false,
+          "pct": 6.87,
+          "pct_chg": 6.87,
+          "turnover": 7.14,
+          "vol_ratio": 1.16,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 23.1,
+          "price": 49,
+          "float_mv": 3125000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "603108",
+          "name": "润达医疗",
+          "prob": 62.7,
+          "score": 7,
+          "buy_price": 9.97,
+          "stop_loss": 9.17,
+          "industry": "",
+          "buy_type": "底背离买(B5)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红5天 · 形态加分 7 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 3,
+          "买点等级": "三等",
+          "等级名": "底背离",
+          "is_main": false,
+          "pct": 2.57,
+          "pct_chg": 2.57,
+          "turnover": 4.05,
+          "vol_ratio": 1.13,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 5.3,
+          "price": 10.38,
+          "float_mv": 6276000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "300493",
+          "name": "润欣科技",
+          "prob": 62.7,
+          "score": 7,
+          "buy_price": 12.58,
+          "stop_loss": 11.57,
+          "industry": "",
+          "buy_type": "底背离买(B5)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红5天 · 形态加分 7 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 3,
+          "买点等级": "三等",
+          "等级名": "底背离",
+          "is_main": false,
+          "pct": -0.14,
+          "pct_chg": -0.14,
+          "turnover": 9.86,
+          "vol_ratio": 0.93,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 23.1,
+          "price": 14.3,
+          "float_mv": 7323000000,
           "buyable": true,
           "buyable_note": "未封板，可买入"
         }
