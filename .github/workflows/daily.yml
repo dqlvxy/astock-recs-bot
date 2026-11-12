@@ -8,9 +8,12 @@ name: 每日稳健版荐股 + 全模块快照
 #   最坏 14:45 触发 + 3 分钟跑完 = 14:48 落地，仍赶在 14:50 买入前。
 #   定稿一经生成即冻结：当日已有存档则 generate.js 跳过重算，不覆盖。
 #
-#   ⚠ 本工作流没有任何手动触发入口（2026-11-09 老板要求删除，连同 force 覆盖参数一并清理）。
-#     唯一来源就是上面 5 个 cron。若某天全部触发点都被 GitHub 丢弃，当天不会有荐股 ——
-#     这是「不要手动按钮」的必然代价，已知并接受。
+#   ⚠ 本工作流没有任何手动触发按钮（2026-11-09 老板要求删除）。
+#     触发来源有两条，都不产生 Actions 页面上的「Run workflow」按钮：
+#     ① 下面 5 档 GitHub schedule cron（兜底；免费版漂移严重，实测晚 40 分钟~8 小时不等，11-09 曾整批丢弃）；
+#     ② repository_dispatch 事件 astock-tick：由 Cloudflare Worker「astock-poke」在工作日北京 14:00
+#        （UTC 06:00）准点调用 GitHub dispatch API 戳一下，绕过 GitHub schedule 漂移，保证 14:30 前出票。
+#     repository_dispatch 只能由 API 带 token 触发，网页上不可见、不可手点，不违反「无手动入口」约束。
 on:
   schedule:
     - cron: "5 6 * * 1-5"
@@ -18,6 +21,8 @@ on:
     - cron: "25 6 * * 1-5"
     - cron: "35 6 * * 1-5"
     - cron: "45 6 * * 1-5"
+  repository_dispatch:
+    types: [astock-tick]
 
 permissions:
   contents: write        # 允许把 recs.json / today.json / watch.json 提交回仓库
