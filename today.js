@@ -404,6 +404,71 @@ function 数据归属日(){
   return 上一交易日();
 }
 
+/* ── 资金流快照（2026-11-12 新增·修复看板「资金流接口未接通」）─────────────
+   前端 fetchSectorFund 的三级链路是：/api/fund 代理 → 重试一次 → today.json 快照。
+   但 /api/fund 依赖 Cloudflare Pages Functions，旧 Pages 站下线后 GitHub Pages
+   下该路径恒 404；而本文件此前从未写过 sector_fund 字段 —— 三级全断，
+   看板只能回退「涨停封单」口径并打出「资金流接口未接通」。
+   现在由采集侧直接把主力净额抓进 today.json，前端第三级兜底即可拿到真实数据，
+   彻底不依赖任何代理或第三方域名直连。
+   源：新浪财经个股主力净额 JSONP（本机实测 HTTP 200 可用；东财 push2 在部分
+   网络整域不通，故不作为唯一源）。返回结构对齐前端 renderSectorFlow 的
+   { 口径, 源, rows:[{name, code, net}] }，net 单位为元。 */
+const 新浪资金URL =
+  "https://vip.stock.finance.sina.com.cn/quotes_service/api/jsonp_v2.php/__cb/" +
+  "MoneyFlow.ssl_bkzj_ssggzj?num=80&sort=netamount&asc=";
+
+async function 抓资金流JSONP(url) {
+  try {
+    const r = await fetch(url, {
+      headers: {
+        "User-Agent": UA,
+        "Referer": "https://vip.stock.finance.sina.com.cn/moneyflow/",
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) return null;
+    const t = await r.text();
+    const m = t.match(/\(([\s\S]*?)\)\s*;?\s*$/);
+    if (!m) return null;
+    return JSON.parse(m[1]);
+  } catch (e) {
+    return null;
+  }
+}
+
+async function 建资金流() {
+  const 转 = (arr) =>
+    (arr || [])
+      .filter(
+        (x) =>
+          x && x.symbol &&
+          /^(sh6\d{5}|sz[03]\d{5}|bj[489]\d{5})$/.test(x.symbol) &&
+          !/ETF|LOF|基金|转债|国债|指数|债券/.test(String(x.name || ""))
+      )
+      .map((x) => ({
+        name: x.name,
+        code: x.symbol.replace(/^(sh|sz|bj)/, ""),
+        net: parseFloat(x.netamount) || 0,
+      }))
+      .filter((x) => x.net !== 0);
+
+  let 行 = [];
+  /* 正/负各取一次（asc=0 净流入榜、asc=1 净流出榜），与旧代理口径一致 */
+  for (const asc of ["0", "1"]) {
+    const arr = await 抓资金流JSONP(新浪资金URL + asc + "&_r=" + Date.now());
+    if (arr && arr.length) 行 = 行.concat(转(arr));
+  }
+  if (!行.length) { console.log("  资金流：两个方向均未取到数据"); return null; }
+  console.log(`  资金流：${行.length} 条（新浪口径）`);
+  return {
+    口径: "个股",
+    源: "新浪财经 · 采集快照",
+    time: new Date().toLocaleString("sv-SE").replace("T", " "),
+    rows: 行,
+  };
+}
+
 async function main() {
   const 今日 = 今日键();
   const 是交易日 = !(是周末() || 是休市日(今日));
@@ -479,6 +544,10 @@ async function main() {
       : "总仓位 ≤10%，降频 1-2 只试探（不空仓），等主线明确再加仓")
     : "";
 
+  /* 资金流：失败不影响主流程，缺字段时前端仍按原逻辑回落封单口径 */
+  let 资金流 = null;
+  try { 资金流 = await 建资金流(); } catch (e) { console.log("  资金流生成失败：", e.message); }
+
   let 包 = {
     ok: true,
     gen_time: new Date().toLocaleString("sv-SE").replace("T", " "),
@@ -498,6 +567,7 @@ async function main() {
     zb_count: zbN,
     main_lines: 主线,
     watch: watch,
+    sector_fund: 资金流,
   };
 
   /* 同交易日合并（2026-10-16 修复）：非交易时段（凌晨/盘前）重跑时，
@@ -514,6 +584,7 @@ async function main() {
         if ((!包.yaogu || !包.yaogu.length) && 旧包.yaogu && 旧包.yaogu.length) { 包.yaogu = 旧包.yaogu; 补齐.push("yaogu"); }
         if ((!包.ladder || !包.ladder.length) && 旧包.ladder && 旧包.ladder.length) { 包.ladder = 旧包.ladder; 补齐.push("ladder"); }
         if ((!包.main_lines || !包.main_lines.length) && 旧包.main_lines && 旧包.main_lines.length) { 包.main_lines = 旧包.main_lines; 补齐.push("main_lines"); }
+        if ((!包.sector_fund || !包.sector_fund.rows || !包.sector_fund.rows.length) && 旧包.sector_fund && 旧包.sector_fund.rows && 旧包.sector_fund.rows.length) { 包.sector_fund = 旧包.sector_fund; 补齐.push("sector_fund"); }
         if (补齐.length) console.log(`  ↺ 同交易日快照补齐（盘后接口返回空）：${补齐.join("/")}`);
       }
     }
@@ -524,7 +595,7 @@ async function main() {
   try { writeFileSync("watch.json", JSON.stringify(watch, null, 2), "utf-8"); } catch (e) {}
   console.log(
     `✅ 已写入 ${输出文件}：指数 ${Object.keys(index).length} 个 · 涨停 ${包.zt_total} · ` +
-      `梯队 ${Object.values(ladder).reduce((s, v) => s + v.length, 0)} · 妖股 ${yaogu.length}(命中 ${hit_total}) · 龙虎榜 ${lhb.length} · 自选 ${watch.items.length}`
+      `梯队 ${Object.values(ladder).reduce((s, v) => s + v.length, 0)} · 妖股 ${yaogu.length}(命中 ${hit_total}) · 龙虎榜 ${lhb.length} · 自选 ${watch.items.length} · 资金流 ${包.sector_fund ? 包.sector_fund.rows.length : 0}`
   );
 }
 
