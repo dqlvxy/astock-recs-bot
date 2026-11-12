@@ -1287,7 +1287,13 @@ function buildPicks(hard, mainNames, 已推码集, 目标数) {
     已见[p.code] = 1;
     池1.push(p);
   }
-  const 池2 = 已推码集 && Object.keys(已推码集).length ? 池1.filter((p) => !已推码集[p.code]) : 池1;
+  /* 2026-11-12 杜哥定（永久）：一等·双金共振不参与跨期去重。
+     一等票本就稀缺（24 期仅 4 只），若按「近 3 期推过即排除」一律删掉，
+     等于用去重规则把最高等级票从推荐里挤出去，与「尾盘选股必须优先推荐一等」直接冲突。 */
+  const 是一等 = (p) => (p && (p.buy_rank === 1 || p.tier === "S"));
+  const 池2 = 已推码集 && Object.keys(已推码集).length
+    ? 池1.filter((p) => !已推码集[p.code] || 是一等(p))
+    : 池1;
   const 去重后 = 池2.length >= 3 ? 池2 : 池1; // 兜底：排除后不足 3 只则放开跨期限制
   picks = 去重后;
 
@@ -1314,7 +1320,10 @@ function buildPicks(hard, mainNames, 已推码集, 目标数) {
     if (top.length >= N) break;
     if (!可加(it2)) continue;
     const 键 = it2.industry || "其他";
-    if (seen[键]) continue;
+    /* 2026-11-12 杜哥定（永久）：一等·双金共振优先占位。
+       「同行业只取一只」是分散度约束，但它会在一等票同行业时把第二只一等挡在门外，
+       与「一等优先」冲突；一等票数由 CFG.双金只数（默认 2）单独封顶，风险敞口仍受控。 */
+    if (seen[键] && !是双金(it2)) continue;
     seen[键] = 1;
     top.push(it2); 记入(it2);
   }
@@ -1426,7 +1435,10 @@ async function runStable(prog, 已推码集) {
      信号票 ≥5 只 → 收窄到信号票（金叉选股）；<5 只 → 全部候选参与（兜底，避免弱势市况空仓），
      此时金叉/底背离仍以加分形式影响排序（buildPicks 技术形态加分）。 */
   try {
-    const 信号票 = hard.filter((it) => it.金叉序 > 0 || it.均线金叉序 > 0 || it.底背离);
+    /* 2026-11-12 杜哥定（永久）：一等·双金共振必须优先推荐，不得被上游信号层误杀。
+       原口径只认「MACD 金叉 / 均线金叉 / 底背离」，双金共振若金叉落在 CFG.金叉窗口 之外
+       （金叉序=0）就会被这一层整只剔掉，等于把最高等级票在漏斗里丢掉。故显式并入信号票。 */
+    const 信号票 = hard.filter((it) => it.金叉序 > 0 || it.均线金叉序 > 0 || it.底背离 || it.双金);
     if (CFG.金叉必选 && 信号票.length >= 5 && 信号票.length < hard.length) {
       P(74, `技术信号优选：金叉/均线金叉/底背离 ${信号票.length} 只（原 ${hard.length} 只）→ 按金叉选股口径收窄`);
       hard = 信号票;
