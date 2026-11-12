@@ -26,7 +26,8 @@ const zoneMap = {
   xinjiapo: qiniu.zone.ZoneXinjiapo,
 };
 const mac = new qiniu.auth.digest.Mac(AK, SK);
-const putPolicy = new qiniu.rs.PutPolicy({ scope: BUCKET });
+// insertOnly: 0 允许同日重跑覆盖同名归档；七牛默认 1（不可覆盖），重复上传会返 614 file exists
+const putPolicy = new qiniu.rs.PutPolicy({ scope: BUCKET, insertOnly: 0 });
 const uploadToken = putPolicy.uploadToken(mac);
 
 const config = new qiniu.conf.Config();
