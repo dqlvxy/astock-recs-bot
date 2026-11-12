@@ -131,6 +131,18 @@ jobs:
           echo "$HASH" > .build-commit
           echo "哈希文件已生成（供外部部署脚本读取）"
 
+      # ── ③'' 七牛云归档：作为 GitHub 之外的第二份快照副本 ───────────
+      #   七牛 Kodo 华东桶，免费 10GB/月；按日期归档 archive/YYYYMMDD/xxx.json
+      #   AK/SK 从 GitHub Secrets 读，不写死在代码里。
+      #   Secret 未配置时脚本自动 SKIP，不阻断主流程。
+      - name: 七牛云归档快照
+        if: steps.gate.outputs.already != '1'
+        run: node scripts/upload-qiniu.mjs
+        env:
+          QINIU_AK: ${{ secrets.QINIU_AK }}
+          QINIU_SK: ${{ secrets.QINIU_SK }}
+          QINIU_BUCKET: ${{ secrets.QINIU_BUCKET }}
+
       # ── ④ 上传产物，便于事后下载检查 ───────────────────────────────
       - name: 上传产物
         uses: actions/upload-artifact@v4
