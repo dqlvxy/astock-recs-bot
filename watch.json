@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updated": "2026-11-13 14:26:12",
+  "updated": "2026-11-15 06:16:01",
   "items": [
     {
       "code": "588170",
@@ -8,7 +8,7 @@
       "price": 0.706,
       "chg": -2.62,
       "pct": -2.62,
-      "turnover": 22.34,
+      "turnover": 22.03,
       "vol_ratio": 1.11,
       "amt_yi": 100.45,
       "prob": {
@@ -601,7 +601,7 @@
       "price": 0.418,
       "chg": -5.64,
       "pct": -5.64,
-      "turnover": 13.69,
+      "turnover": 13.73,
       "vol_ratio": 1.04,
       "amt_yi": 36.08,
       "prob": {
@@ -2380,7 +2380,7 @@
       "price": 1.375,
       "chg": -2.55,
       "pct": -2.55,
-      "turnover": 3.03,
+      "turnover": 3.06,
       "vol_ratio": 0.94,
       "amt_yi": 5.19,
       "prob": {
@@ -3566,7 +3566,7 @@
       "price": 1.173,
       "chg": -0.68,
       "pct": -0.68,
-      "turnover": 6.49,
+      "turnover": 6.11,
       "vol_ratio": 14.38,
       "amt_yi": 7.38,
       "prob": {
