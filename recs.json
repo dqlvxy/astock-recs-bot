@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "updated": "2026-11-13 14:25:48",
-  "count": 26,
+  "updated": "2026-11-16 06:17:47",
+  "count": 27,
   "recs": [
     {
       "date": "20261008",
@@ -7830,6 +7830,45 @@
           "pct_chg_5d": 10.7,
           "price": 30.09,
           "float_mv": 3090000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        }
+      ]
+    },
+    {
+      "date": "20261116",
+      "gen_time": "2026-11-16 06:17:47",
+      "picks": [
+        {
+          "code": "603767",
+          "name": "中马传动",
+          "prob": 62.7,
+          "score": 7,
+          "buy_price": 16.31,
+          "stop_loss": 15.01,
+          "industry": "",
+          "buy_type": "底背离买(B5)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红4天 · 形态加分 7 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 3,
+          "买点等级": "三等",
+          "等级名": "底背离",
+          "is_main": false,
+          "pct": -3.16,
+          "pct_chg": -3.16,
+          "turnover": 7.87,
+          "vol_ratio": 1.68,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 6.9,
+          "price": 17.18,
+          "float_mv": 5302000000,
           "buyable": true,
           "buyable_note": "未封板，可买入"
         }
