@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "updated": "2026-11-16 06:17:47",
-  "count": 27,
+  "updated": "2026-11-17 06:17:24",
+  "count": 28,
   "recs": [
     {
       "date": "20261008",
@@ -7869,6 +7869,111 @@
           "pct_chg_5d": 6.9,
           "price": 17.18,
           "float_mv": 5302000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        }
+      ]
+    },
+    {
+      "date": "20261117",
+      "gen_time": "2026-11-17 06:17:24",
+      "picks": [
+        {
+          "code": "300637",
+          "name": "扬帆新材",
+          "prob": 62.7,
+          "score": 7,
+          "buy_price": 9.71,
+          "stop_loss": 8.93,
+          "industry": "",
+          "buy_type": "底背离买(B5)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红4天 · 形态加分 7 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 3,
+          "买点等级": "三等",
+          "等级名": "底背离",
+          "is_main": false,
+          "pct": 4.6,
+          "pct_chg": 4.6,
+          "turnover": 8.04,
+          "vol_ratio": 1.25,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 8.6,
+          "price": 10.23,
+          "float_mv": 2399000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "601598",
+          "name": "中国外运",
+          "prob": 58.3,
+          "score": 3,
+          "buy_price": 7.21,
+          "stop_loss": 6.63,
+          "industry": "",
+          "buy_type": "金叉买(B4)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红2天 · 形态加分 3 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 4,
+          "买点等级": "四等",
+          "等级名": "金叉",
+          "is_main": false,
+          "pct": 0.82,
+          "pct_chg": 0.82,
+          "turnover": 0.3,
+          "vol_ratio": 1.21,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 2.1,
+          "price": 7.36,
+          "float_mv": 37959000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "600993",
+          "name": "马应龙",
+          "prob": 58.3,
+          "score": 3,
+          "buy_price": 25.01,
+          "stop_loss": 23.01,
+          "industry": "",
+          "buy_type": "金叉买(B4)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红1天 · 形态加分 3 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 4,
+          "买点等级": "四等",
+          "等级名": "金叉",
+          "is_main": false,
+          "pct": 3.65,
+          "pct_chg": 3.65,
+          "turnover": 3.18,
+          "vol_ratio": 3.15,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 6.5,
+          "price": 26.16,
+          "float_mv": 11257000000,
           "buyable": true,
           "buyable_note": "未封板，可买入"
         }
