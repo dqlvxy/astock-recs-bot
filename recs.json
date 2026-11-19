@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "updated": "2026-11-18 06:17:34",
-  "count": 29,
+  "updated": "2026-11-19 06:17:38",
+  "count": 30,
   "recs": [
     {
       "date": "20261008",
@@ -8079,6 +8079,111 @@
           "pct_chg_5d": 3.7,
           "price": 8.31,
           "float_mv": 19667000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        }
+      ]
+    },
+    {
+      "date": "20261119",
+      "gen_time": "2026-11-19 06:17:38",
+      "picks": [
+        {
+          "code": "600060",
+          "name": "海信视像",
+          "prob": 58.3,
+          "score": 3,
+          "buy_price": 27.16,
+          "stop_loss": 24.99,
+          "industry": "",
+          "buy_type": "金叉买(B4)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红3天 · 形态加分 3 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 4,
+          "买点等级": "四等",
+          "等级名": "金叉",
+          "is_main": false,
+          "pct": 1.31,
+          "pct_chg": 1.31,
+          "turnover": 1.11,
+          "vol_ratio": 1.24,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 13.4,
+          "price": 28.67,
+          "float_mv": 37414000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "600132",
+          "name": "重庆啤酒",
+          "prob": 58.3,
+          "score": 3,
+          "buy_price": 39.14,
+          "stop_loss": 36.01,
+          "industry": "",
+          "buy_type": "金叉买(B4)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红3天 · 形态加分 3 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 4,
+          "买点等级": "四等",
+          "等级名": "金叉",
+          "is_main": false,
+          "pct": 0.35,
+          "pct_chg": 0.35,
+          "turnover": 0.55,
+          "vol_ratio": 0.82,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 5.4,
+          "price": 39.86,
+          "float_mv": 19291000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "601728",
+          "name": "中国电信",
+          "prob": 58.3,
+          "score": 3,
+          "buy_price": 6.87,
+          "stop_loss": 6.32,
+          "industry": "",
+          "buy_type": "金叉买(B4)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红1天 · 形态加分 3 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 4,
+          "买点等级": "四等",
+          "等级名": "金叉",
+          "is_main": false,
+          "pct": -1.13,
+          "pct_chg": -1.13,
+          "turnover": 0.08,
+          "vol_ratio": 0.72,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 5.9,
+          "price": 7,
+          "float_mv": 543408000000,
           "buyable": true,
           "buyable_note": "未封板，可买入"
         }
