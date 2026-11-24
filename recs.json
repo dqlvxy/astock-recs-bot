@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "updated": "2026-11-23 06:17:16",
-  "count": 32,
+  "updated": "2026-11-24 06:17:49",
+  "count": 33,
   "recs": [
     {
       "date": "20261008",
@@ -238,20 +238,17 @@
           "stop_loss": 24.46,
           "industry": "",
           "buy_type": "突破买(B1)",
-          "reasons": {
-            "tech": "MA多头·MACD红11天·量比1.7·换手2.3%",
-            "fund": "ROE 9.3% · 净利同比 37.7%",
-            "msg": "近30天新闻 10 条 · 情感净分 0"
-          },
+          "tier": "A",
+          "tier_name": "常规",
+          "buy_rank": 6,
+          "买点等级": "六等",
           "is_main": false,
           "pct": 1.77,
           "pct_chg": 1.77,
           "turnover": 2.29,
           "vol_ratio": 1.65,
-          "buy_rank": 6,
-          "买点等级": "六等",
-          "等级名": "突破",
-          "等级补录": "买点反推"
+          "buyable": true,
+          "精简": 1
         },
         {
           "code": "603209",
@@ -262,20 +259,17 @@
           "stop_loss": 14.04,
           "industry": "",
           "buy_type": "突破买(B1)",
-          "reasons": {
-            "tech": "MA多头·MACD红3天·量比1.8·换手2.9%",
-            "fund": "ROE 6.2% · 净利同比 57.1%",
-            "msg": "近30天新闻 10 条 · 情感净分 +2"
-          },
+          "tier": "A",
+          "tier_name": "常规",
+          "buy_rank": 6,
+          "买点等级": "六等",
           "is_main": false,
           "pct": 2.08,
           "pct_chg": 2.08,
           "turnover": 2.9,
           "vol_ratio": 1.8,
-          "buy_rank": 6,
-          "买点等级": "六等",
-          "等级名": "突破",
-          "等级补录": "买点反推"
+          "buyable": true,
+          "精简": 1
         },
         {
           "code": "601900",
@@ -286,20 +280,17 @@
           "stop_loss": 12.34,
           "industry": "",
           "buy_type": "突破买(B1)",
-          "reasons": {
-            "tech": "MA多头·MACD红3天·量比1.7·换手2.8%",
-            "fund": "ROE 5.2% · 净利同比 5.3%",
-            "msg": "近30天新闻 10 条 · 情感净分 +3"
-          },
+          "tier": "A",
+          "tier_name": "常规",
+          "buy_rank": 6,
+          "买点等级": "六等",
           "is_main": false,
           "pct": 0.68,
           "pct_chg": 0.68,
           "turnover": 2.82,
           "vol_ratio": 1.7,
-          "buy_rank": 6,
-          "买点等级": "六等",
-          "等级名": "突破",
-          "等级补录": "买点反推"
+          "buyable": true,
+          "精简": 1
         },
         {
           "code": "002712",
@@ -310,20 +301,17 @@
           "stop_loss": 5.07,
           "industry": "",
           "buy_type": "突破买(B1)",
-          "reasons": {
-            "tech": "MA多头·MACD红2天·量比1.7·换手6.3%",
-            "fund": "ROE 0.1% · 净利同比 108.9%",
-            "msg": "近30天新闻 10 条 · 情感净分 +3"
-          },
+          "tier": "A",
+          "tier_name": "常规",
+          "buy_rank": 6,
+          "买点等级": "六等",
           "is_main": false,
           "pct": 2.62,
           "pct_chg": 2.62,
           "turnover": 6.31,
           "vol_ratio": 1.74,
-          "buy_rank": 6,
-          "买点等级": "六等",
-          "等级名": "突破",
-          "等级补录": "买点反推"
+          "buyable": true,
+          "精简": 1
         },
         {
           "code": "300133",
@@ -334,20 +322,17 @@
           "stop_loss": 7.34,
           "industry": "",
           "buy_type": "回踩买(B2)",
-          "reasons": {
-            "tech": "MA多头·MACD红9天·量比1.2·换手9.8%",
-            "fund": "ROE 2.3% · 净利同比 42%",
-            "msg": "近30天新闻 10 条 · 情感净分 +3"
-          },
+          "tier": "A",
+          "tier_name": "常规",
+          "buy_rank": 7,
+          "买点等级": "七等",
           "is_main": false,
           "pct": 1.32,
           "pct_chg": 1.32,
           "turnover": 9.78,
           "vol_ratio": 1.2,
-          "buy_rank": 7,
-          "买点等级": "七等",
-          "等级名": "回踩",
-          "等级补录": "买点反推"
+          "buyable": true,
+          "精简": 1
         }
       ]
     },
@@ -8397,6 +8382,177 @@
           "pct_chg_5d": 8,
           "price": 9.53,
           "float_mv": 1186000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        }
+      ]
+    },
+    {
+      "date": "20261124",
+      "gen_time": "2026-11-24 06:17:49",
+      "picks": [
+        {
+          "code": "603166",
+          "name": "福达股份",
+          "prob": 62.7,
+          "score": 7,
+          "buy_price": 10.46,
+          "stop_loss": 9.62,
+          "industry": "",
+          "buy_type": "强势延续(B6)",
+          "reasons": {
+            "形态": "MA多头·MACD无红柱 · 形态加分 7 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 2,
+          "买点等级": "二等",
+          "等级名": "强势延续",
+          "is_main": false,
+          "pct": 7.43,
+          "pct_chg": 7.43,
+          "turnover": 4.86,
+          "vol_ratio": 1.73,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 3.5,
+          "price": 10.55,
+          "float_mv": 6781000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "601919",
+          "name": "中远海控",
+          "prob": 58.3,
+          "score": 3,
+          "buy_price": 17.47,
+          "stop_loss": 16.07,
+          "industry": "",
+          "buy_type": "金叉买(B4)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红2天 · 形态加分 3 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 4,
+          "买点等级": "四等",
+          "等级名": "金叉",
+          "is_main": false,
+          "pct": 0.96,
+          "pct_chg": 0.96,
+          "turnover": 0.54,
+          "vol_ratio": 0.94,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 2.2,
+          "price": 17.81,
+          "float_mv": 222744999999.99997,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "000024",
+          "name": "招商地产",
+          "prob": 58.3,
+          "score": 3,
+          "buy_price": 37.01,
+          "stop_loss": 34.05,
+          "industry": "",
+          "buy_type": "金叉买(B4)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红2天 · 形态加分 3 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 4,
+          "买点等级": "四等",
+          "等级名": "金叉",
+          "is_main": false,
+          "pct": 0,
+          "pct_chg": 0,
+          "turnover": 0,
+          "vol_ratio": 0,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 10.8,
+          "price": 40.5,
+          "float_mv": 41570000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "002642",
+          "name": "荣联科技",
+          "prob": 58.3,
+          "score": 3,
+          "buy_price": 7.08,
+          "stop_loss": 6.51,
+          "industry": "",
+          "buy_type": "金叉买(B4)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红3天 · 形态加分 3 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 4,
+          "买点等级": "四等",
+          "等级名": "金叉",
+          "is_main": false,
+          "pct": -0.38,
+          "pct_chg": -0.38,
+          "turnover": 26,
+          "vol_ratio": 9.25,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 19.8,
+          "price": 7.96,
+          "float_mv": 5266000000,
+          "buyable": true,
+          "buyable_note": "未封板，可买入"
+        },
+        {
+          "code": "300539",
+          "name": "横河精密",
+          "prob": 57.2,
+          "score": 2,
+          "buy_price": 20.11,
+          "stop_loss": 18.5,
+          "industry": "",
+          "buy_type": "金叉买(B4)",
+          "reasons": {
+            "形态": "MA多头·MACD红柱加长·红1天 · 形态加分 2 分"
+          },
+          "tier": "A",
+          "tier_name": "常规",
+          "共振": null,
+          "buy_rank": 4,
+          "买点等级": "四等",
+          "等级名": "金叉",
+          "is_main": false,
+          "pct": 18.49,
+          "pct_chg": 18.49,
+          "turnover": 19.82,
+          "vol_ratio": 1.82,
+          "scores": null,
+          "scores_detail": {
+            "加分": []
+          },
+          "pct_chg_5d": 12.1,
+          "price": 22.3,
+          "float_mv": 4872000000,
           "buyable": true,
           "buyable_note": "未封板，可买入"
         }
